@@ -194,10 +194,17 @@ def hyper_planes(w, x, z, prior_mu, prior_sigma, draw_prior):
     else:
         return npr.multivariate_normal(prior_mu, prior_sigma)  # If no data points then draw from prior.
 
-def hyperplane(w, x, z, prior_mu, prior_sigma, draw_prior):
+def hyperplane(w, x, z, prior_mu, prior_tau, draw_prior):
     if draw_prior:
-        return npr.multivariate_normal(prior_mu, prior_precision)
+        return npr.multivariate_normal(prior_mu, np.linalg.inv(prior_tau))
     else:
+        assert np.sum(z>=2) == 0
+        k = z[:, na]%2 - 0.5
+        posterior_cov = np.linalg.inv( prior_tau + x @ np.diag(w) @ x.T)
+        posterior_mu = posterior_cov @ (x @ k + prior_tau @ prior_mu[:, na]).flatten()
+        return npr.multivariate_normal(posterior_mu.flatten(), posterior_cov)
+        
+        
         
 
 
