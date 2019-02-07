@@ -175,7 +175,7 @@ Vx = 1000 * np.eye(dim + 1)
 #Hyperplanes
 mu = np.zeros(dim + 1)
 Sigma = 10000 * np.eye(dim + 1)
-tau = 1e-6 * np.eye(dim + 1)
+tau = 1e-8 * np.eye(dim + 1)
 #boolean mask
 mask = [np.ones(X[idx][0, 1:].size).astype(bool) for idx in range(no_realizations)]
 
@@ -240,13 +240,16 @@ for k in range(K):
 
 # In[6]:
 "Test hyperplanes"
-no_samples = 100
+no_samples = 300
 Rroot = np.zeros((dim + 1, 1, no_samples))
 Rsecond = np.zeros((dim + 1, 2, no_samples))
 
+Rroot = np.ones((dim + 1, 1, no_samples))
+Rsecond = np.ones((dim + 1, 2, no_samples))
+
 R_place = []
 for level in range(depth - 1):
-    R_place.append(2*npr.rand(dim + 1, 2**level) - 1)
+    R_place.append(0*(2*npr.rand(dim + 1, 2**level) - 1))
 #R_place = copy.deepcopy(R)
 omega = [ np.zeros((depth - 1, X[idx][0, :].size)) for idx in range(len(X)) ]
 for m in tqdm(range(no_samples)):

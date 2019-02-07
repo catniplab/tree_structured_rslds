@@ -103,6 +103,7 @@ Sstart = np.eye(D_out)
 
 
 # In[]:
+npr.seed(10)
 kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Qstart, 'emission': C, 'emission_noise': Sstart,
           'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path, 'leaf_nodes': leaf_nodes, 'scale':0.5}
 trslds = TroSLDS(**kwargs)
@@ -110,7 +111,7 @@ trslds = TroSLDS(**kwargs)
 for idx in range(no_realizations):
     trslds._add_data(X[idx], Yreal[idx], Z[idx], Path[idx])
 
-no_samples = 10
+no_samples = 1000
 trslds._initialize_polya_gamma() # Initialze polya-gamma rvs
 for m in tqdm(range(no_samples)):
     trslds._sample_emission() #sample emission parameters
@@ -132,7 +133,7 @@ transform = np.linalg.lstsq(Xrot, Xreals)[0].T
 Xinferr = [transform[:, :-1] @ Xinferr[idx] + transform[:, -1][:, na] for idx in range(len(Xinferr))]
 
 Zinferr = trslds.z
-fig = plt.figure()
+fig = plt.figure(figsize=(10, 10))
 ax = fig.add_subplot(111)
 for idx in tqdm(range(no_realizations)):
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 0)], Xinferr[idx][1, np.where(Zinferr[idx] == 0)], color='green')
