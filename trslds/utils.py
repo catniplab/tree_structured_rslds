@@ -313,3 +313,11 @@ def optimize_tree(y, x, LDS, nu, ancestor_weights, K, HP, path_LDS, max_epoch, b
             optimizer.step()
 
     return LD, hp
+
+# In[13]:
+def projection(xreal, xinferr):
+    Xreals = np.hstack(xreal).T
+    Xrot = np.hstack(xinferr).T
+    Xrot = np.hstack((Xrot, np.ones((Xrot[:, 0].size, 1))))
+    transform = np.linalg.lstsq(Xrot, Xreals)[0].T
+    return transform
