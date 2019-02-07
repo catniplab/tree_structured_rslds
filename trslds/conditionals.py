@@ -166,7 +166,7 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
 
 # In[5]:
 #@jit(nopython=True)
-def hyper_planes(w, x, z, prior_mu, prior_sigma, draw_prior):
+def hyper_planes(w, x, z, prior_mu, prior_precision, draw_prior):
     '''
     Sample from the conditional posterior of the hyperplane. Due to the polya-gamma augmentation, the model is normal.
     :param w: list of polya gamma rvs
@@ -178,35 +178,20 @@ def hyper_planes(w, x, z, prior_mu, prior_sigma, draw_prior):
     :return: sample from conditional posterior
     '''
     if draw_prior == False:
-        precision = np.linalg.inv(prior_sigma)
-        J = precision @ prior_mu[:, na] # J = Sigma^{-1}*mu
+        J = prior_precision @ prior_mu[:, na] # J = Sigma^{-1}*mu
         xw_tilde = np.multiply(x, np.sqrt(w[na, :]))  # pre multiply by sqrt(w_n,t )
-        precision += np.einsum('ij,ik->jk', xw_tilde.T,
+        precision = np.einsum('ij,ik->jk', xw_tilde.T,
                                  xw_tilde.T)  # Use einstein summation to compute sum of outer products
 
         k = z % 2 - 0.5 #Check to see if you went left or right from current node
         J += np.sum(x * k[na, :], axis=1)[:, na]
-
-        posterior_cov = np.linalg.inv(precision) #Obtain posterior covariance
+        
+        posterior_cov = np.linalg.inv(precision + prior_precision) #Obtain posterior covariance
         posterior_mu = posterior_cov @ J
 
         return npr.multivariate_normal(posterior_mu.flatten(), posterior_cov)  # Return sample from posterior.
     else:
-        return npr.multivariate_normal(prior_mu, prior_sigma)  # If no data points then draw from prior.
-
-def hyperplane(w, x, z, prior_mu, prior_tau, draw_prior):
-    if draw_prior:
-        return npr.multivariate_normal(prior_mu, np.linalg.inv(prior_tau))
-    else:
-        assert np.sum(z>=2) == 0
-        k = z[:, na]%2 - 0.5
-        posterior_cov = np.linalg.inv( prior_tau + x @ np.diag(w) @ x.T)
-        posterior_mu = posterior_cov @ (x @ k + prior_tau @ prior_mu[:, na]).flatten()
-        return npr.multivariate_normal(posterior_mu.flatten(), posterior_cov)
-        
-        
-        
-
+        return npr.multivariate_normal(prior_mu, precision)  # If no data points then draw from prior.
 
 # In[6]:
 def _internal_dynamics(Mprior, Vparent, Achild, Vchild, N=2):

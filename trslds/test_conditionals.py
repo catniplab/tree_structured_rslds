@@ -175,7 +175,7 @@ Vx = 1000 * np.eye(dim + 1)
 #Hyperplanes
 mu = np.zeros(dim + 1)
 Sigma = 10000 * np.eye(dim + 1)
-
+tau = 1e-6 * np.eye(dim + 1)
 #boolean mask
 mask = [np.ones(X[idx][0, 1:].size).astype(bool) for idx in range(no_realizations)]
 
@@ -240,23 +240,25 @@ for k in range(K):
 
 # In[6]:
 "Test hyperplanes"
-#no_samples = 5000
-#Rroot = np.zeros((dim + 1, 1, no_samples))
-#Rsecond = np.zeros((dim + 1, 2, no_samples))
-#
-#R_place = []
-#for level in range(depth - 1):
-#    R_place.append(2*npr.rand(dim + 1, 2**level) - 1)
-##R_place = copy.deepcopy(R)
-#omega = [ np.zeros((depth - 1, X[idx][0, :].size)) for idx in range(len(X)) ]
-#for m in tqdm(range(no_samples)):
-#    omega = samp.pg_tree_posterior(X, omega, R_place, paths, depth)
+no_samples = 100
+Rroot = np.zeros((dim + 1, 1, no_samples))
+Rsecond = np.zeros((dim + 1, 2, no_samples))
+
+R_place = []
+for level in range(depth - 1):
+    R_place.append(2*npr.rand(dim + 1, 2**level) - 1)
+#R_place = copy.deepcopy(R)
+omega = [ np.zeros((depth - 1, X[idx][0, :].size)) for idx in range(len(X)) ]
+for m in tqdm(range(no_samples)):
+    omega = samp.pg_tree_posterior(X, omega, R_place, paths, depth)
 #    R_place = utils.sample_hyperplanes(X, omega, paths, depth, mu, Sigma, 
 #                                       possible_paths, R_place)
-#    Rroot[:, :, m] = R_place[0]
-#    Rsecond[:, :, m] = R_place[1]
-#R1est = np.mean(Rroot[:, :, int(no_samples/2):], axis=2)
-#R2est = np.mean(Rsecond[:, :, int(no_samples/2):], axis=2)
+    R_place = utils.sample_hyperplanes(X, omega, paths, depth, mu, tau, 
+                                       possible_paths, R_place)
+    Rroot[:, :, m] = R_place[0]
+    Rsecond[:, :, m] = R_place[1]
+R1est = np.mean(Rroot[:, :, int(no_samples/2):], axis=2)
+R2est = np.mean(Rsecond[:, :, int(no_samples/2):], axis=2)
 
 # In[7]:
 "Test discrete latent states"
