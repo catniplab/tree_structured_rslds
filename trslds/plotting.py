@@ -2,6 +2,7 @@ import numpy as np
 import numpy.random as npr
 import utils
 from numpy import newaxis as na
+from matplotlib.colors import LinearSegmentedColormap
 
 
 # In[1]:
@@ -71,7 +72,7 @@ def vector_field(Aleaf, R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K):
 
             arrows[rows, cols, :] = arrow-np.array(pts).flatten()
 
-    return x,y, arrows
+    return x, y, arrows
 
 # In[4]:
 def rot_vector_field(Aleaf,R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K, transform):
@@ -102,3 +103,30 @@ def rot_vector_field(Aleaf,R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K
 
             arrows[rows, cols, :] = np.array(og_arrow - og_pt).flatten()
     return x, y, arrows
+
+# In[14]:
+def gradient_cmap(gcolors, nsteps=256, bounds=None):
+    """
+    Make a colormap that interpolates between a set of colors
+    """
+    ncolors = len(gcolors)
+    if bounds is None:
+        bounds = np.linspace(0, 1, ncolors)
+
+    reds = []
+    greens = []
+    blues = []
+    alphas = []
+    for b, c in zip(bounds, gcolors):
+        reds.append((b, c[0], c[0]))
+        greens.append((b, c[1], c[1]))
+        blues.append((b, c[2], c[2]))
+        alphas.append((b, c[3], c[3]) if len(c) == 4 else (b, 1., 1.))
+
+    cdict = {'red': tuple(reds),
+             'green': tuple(greens),
+             'blue': tuple(blues),
+             'alpha': tuple(alphas)}
+
+    cmap = LinearSegmentedColormap('grad_colormap', cdict, nsteps)
+    return cmap

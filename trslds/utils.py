@@ -12,7 +12,6 @@ import conditionals
 import torch
 from torch.autograd import Variable
 import torch.optim as optim
-
 # In[1]:
 def compute_ss_mniw(X, Y, nu, Lambda, M, V ):
     '''
@@ -314,6 +313,7 @@ def optimize_tree(y, x, LDS, nu, ancestor_weights, K, HP, path_LDS, max_epoch, b
             optimizer.step()
 
     return LD, hp
+
 
 # In[13]:
 def projection(xreal, xinferr):
