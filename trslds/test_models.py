@@ -110,7 +110,7 @@ trslds = TroSLDS(**kwargs)
 for idx in range(no_realizations):
     trslds._add_data(X[idx], Yreal[idx], Z[idx], Path[idx])
 
-no_samples = 200
+no_samples = 10
 trslds._initialize_polya_gamma() # Initialze polya-gamma rvs
 for m in tqdm(range(no_samples)):
     trslds._sample_emission() #sample emission parameters

@@ -4,7 +4,7 @@ import fit_greedy_mse as fit
 from sklearn.decomposition import PCA
 import utils
 from numpy import newaxis as na
-
+import numpy.random as npr
 
 def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None):
     D_out = Y[0][:, 0].size  # Find dimension of observed data
@@ -56,7 +56,8 @@ def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None):
 
     "Append starting points to time series"
     for idx in range(len(Y)):
-        X[idx] = np.hstack((starting_pts[:, idx][:, na], X[idx]))
+        X[idx] = np.hstack((starting_pts[:, idx][:, na], X[idx])) + npr.multivariate_normal(np.zeros(D_in), 0.1*np.eye(D_in),
+         size = X[idx][0, :].size + 1).T
 
     "Initialize the dynamics of the tree"
     # Dynamic Parameters
