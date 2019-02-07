@@ -85,7 +85,7 @@ def rotate_dynamics(A, O, depth):
 
 
 # In[5]:
-def sample_hyperplanes(states, omega, paths, depth, prior_mu, prior_sigma, possible_paths, R):
+def sample_hyperplanes(states, omega, paths, depth, prior_mu, prior_tau, possible_paths, R):
     X = np.hstack(states) #stack all continuous latent states
     X = np.vstack((X, np.ones((1, X[0, :].size)))) #append a vector of all ones
     W = np.hstack(omega) #stack all polya-gamma rvs
@@ -103,7 +103,7 @@ def sample_hyperplanes(states, omega, paths, depth, prior_mu, prior_sigma, possi
                 draw_prior = indices.size == 0  # If no data points allocated, draw from the prior
 
                 R[level][:, node] = conditionals.hyper_planes(effective_w, effective_x, effective_z,
-                                                              prior_mu, prior_sigma, draw_prior)
+                                                              prior_mu, prior_tau, draw_prior)
     return R
 
 

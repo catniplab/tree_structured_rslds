@@ -9,7 +9,7 @@ class TroSLDS:
     'The recurrent only TrSLDS. This was the model showcased in Nassar et al. ICLR (2019)'
     def __init__(self, D_in, D_out, K, dynamics, dynamics_noise, emission, hyper_planes, possible_paths, leaf_path,
                  leaf_nodes, D_bias=1, nu=None, nuy=None, Lambda_x=None, Lambda_y=None, My=None, Vy=None,
-                 mu_hyper=None, Sigma_hyper=None, Mx=None, Vx=None, bern=False, emission_noise=None, normalize=True,
+                 mu_hyper=None, tau_hyper=None, Mx=None, Vx=None, bern=False, emission_noise=None, normalize=True,
                  rotate=True, P0=None, scale=None):
         self.D_in = D_in #Dimension of latent states
         self.D_out = D_out #Dimension of observations
@@ -56,9 +56,9 @@ class TroSLDS:
 
 
         #hyperparameters for hyperplanes
-        if mu_hyper is Sigma_hyper is None:
+        if mu_hyper is tau_hyper is None:
             self.mu_hyper = np.zeros(D_in + 1)
-            self.Sigma_hyper = 10000*np.eye(D_in + 1)
+            self.tau_hyper = 1e-4*np.eye(D_in + 1)
 
         #hyperparameters for dynamics
         if nu is Lambda_x is Mx is Vx is None:
@@ -172,7 +172,7 @@ class TroSLDS:
 # In[4]:
     def _sample_hyperplanes(self):
         if self.depth != 1: #If depth is 1 then just a Kalman Filter so no need to sample hyperplanes
-            self.R = utils.sample_hyperplanes(self.x, self.omega, self.path, self.depth, self.mu_hyper, self.Sigma_hyper,
+            self.R = utils.sample_hyperplanes(self.x, self.omega, self.path, self.depth, self.mu_hyper, self.tau_hyper,
                                               self.poss_paths, self.R)
 
 # In[5]:
