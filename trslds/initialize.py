@@ -56,7 +56,7 @@ def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None):
 
     "Append starting points to time series"
     for idx in range(len(Y)):
-        X[idx] = np.hstack((starting_pts[:, idx][:, na], X[idx])) + npr.multivariate_normal(np.zeros(D_in), 0.1*np.eye(D_in),
+        X[idx] = np.hstack((starting_pts[:, idx][:, na], X[idx])) + 0*npr.multivariate_normal(np.zeros(D_in), 0.1*np.eye(D_in),
          size = X[idx][0, :].size + 1).T
 
     "Initialize the dynamics of the tree"
