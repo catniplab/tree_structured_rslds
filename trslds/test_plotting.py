@@ -76,9 +76,9 @@ xmax = 15
 ymin = -15
 ymax = 15
 delta = 0.1
+transform = np.hstack((np.eye(2), np.zeros((2, 1))))
 
-
-X, Y, arrows = plotting.vector_field(true_model.Aleaf, true_model.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K)
+X, Y, arrows = plotting.rot_vector_field(true_model.Aleaf, true_model.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K, transform)
 norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
 U = arrows[:, :, 0]/norm
 V = arrows[:, :, 1]/norm
@@ -87,7 +87,7 @@ ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
 
 # In[3]:
 "Check to see if contour plot works"
-X, Y, color = plotting.contour_plt(true_model.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K)
+X, Y, color = plotting.rot_contour_plt(true_model.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K, transform)
 
 for k in range(K):
     start = np.array([1., 1., 1., 0.])

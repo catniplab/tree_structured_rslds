@@ -96,7 +96,7 @@ def rot_vector_field(Aleaf,R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K
 
             arrow = 0
             for k in range(K):
-                arrow += (p_norm[k] * (Aleaf[:, :-1, k] @ pts + Aleaf[:, -1, k][:, na])).ravel()
+                arrow += (p_norm[k] * (Aleaf[:, :-1, k] @ pts[:, na] + Aleaf[:, -1, k][:, na])).ravel()
 
             #Project onto real space
             og_arrow = transform[:, :-1]@arrow + transform[:, -1]

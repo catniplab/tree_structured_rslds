@@ -6,6 +6,10 @@ from numpy import newaxis as na
 import utils
 import matplotlib.pyplot as plt
 import initialize as init
+import plotting
+import seaborn as sns
+color_names = ["windows blue", "leaf green","red", "orange"]
+colors_leaf = sns.xkcd_palette(color_names)
 npr.seed(0)
 # In[1]:
 D_in = 2
@@ -67,7 +71,7 @@ true_model = TroSLDS(**kwargs) #Create model
 #Generate data from model
 no_realizations = 50
 Tmin = 400
-Tmax = 800
+Tmax = 600
 Xreal = []
 Yreal = []
 Zreal = []
@@ -140,7 +144,42 @@ for idx in tqdm(range(no_realizations)):
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 1)], Xinferr[idx][1, np.where(Zinferr[idx] == 1)], color='red')
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 2)], Xinferr[idx][1, np.where(Zinferr[idx] == 2)], color='blue')
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 3)], Xinferr[idx][1, np.where(Zinferr[idx] == 3)], color='purple')
-    
+
+fig.show()
+# In[]:
+"Check to see if plotting code works"
+fig = plt.figure(figsize=(10, 10))
+ax = fig.add_subplot(111)
+xmin = -15
+xmax = 15
+ymin = -15
+ymax = 15
+delta = 0.1
+
+
+X, Y, arrows = plotting.rot_vector_field(trslds.Aleaf, trslds.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K, transform)
+norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
+U = arrows[:, :, 0]/norm
+V = arrows[:, :, 1]/norm
+
+ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
+
+# In[3]:
+"Check to see if contour plot works"
+X, Y, color = plotting.rot_contour_plt(trslds.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K, transform)
+
+for k in range(K):
+    start = np.array([1., 1., 1., 0.])
+    end = np.concatenate((colors_leaf[k ], [0.5]))
+    cmap = plotting.gradient_cmap([start, end])
+    im1 = ax.imshow(color[:,:,k],
+                    extent=[xmin, xmax, ymin,ymax],
+                    vmin=0, vmax=1, cmap=cmap, origin='lower')
+    ax.set_aspect('auto')
+ax.set_xlim([xmin, xmax])
+ax.set_ylim([ymin, ymax])
+
+fig.show()
 
 
 
