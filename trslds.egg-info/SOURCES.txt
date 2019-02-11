@@ -1,0 +1,16 @@
+README.md
+trslds/conditionals.py
+trslds/fit_greedy_mse.py
+trslds/initialize.py
+trslds/models.py
+trslds/plotting.py
+trslds/test_conditionals.py
+trslds/test_misc.py
+trslds/test_models.py
+trslds/test_plotting.py
+trslds/utils.py
+trslds.egg-info/PKG-INFO
+trslds.egg-info/SOURCES.txt
+trslds.egg-info/dependency_links.txt
+trslds.egg-info/requires.txt
+trslds.egg-info/top_level.txt

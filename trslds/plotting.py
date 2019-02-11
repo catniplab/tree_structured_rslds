@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.random as npr
-import utils
+from trslds import utils
 from numpy import newaxis as na
 from matplotlib.colors import LinearSegmentedColormap
 

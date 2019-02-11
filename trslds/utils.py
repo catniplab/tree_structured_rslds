@@ -1,14 +1,8 @@
 import numpy as np
 import numpy.random as npr
 from numpy import newaxis as na
-import scipy
-from numpy.linalg import LinAlgError
 from scipy.stats import invwishart
-from pypolyagamma import PyPolyaGamma
-import pypolyagamma
-from numba import jit
-import os
-import conditionals
+from trslds import conditionals
 import torch
 from torch.autograd import Variable
 import torch.optim as optim

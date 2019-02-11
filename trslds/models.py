@@ -1,8 +1,8 @@
 import numpy as np
 import numpy.random as npr
 from numba import jit
-import conditionals
-import utils
+from trslds import conditionals
+from trslds import utils
 from numpy import newaxis as na
 import scipy
 class TroSLDS:

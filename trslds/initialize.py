@@ -1,8 +1,8 @@
 import numpy as np
 from scipy import linalg
-import fit_greedy_mse as fit
+from trslds import fit_greedy_mse as fit
 from sklearn.decomposition import PCA
-import utils
+from trslds import utils
 from numpy import newaxis as na
 import numpy.random as npr
 

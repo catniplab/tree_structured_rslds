@@ -12,6 +12,6 @@ setup(name='trslds',
           'scipy>=0.16',
           'matplotlib',
           'seaborn',
-          'pytorch',
+          'torch',
           'pypolyagamma>=1.1'],
       )

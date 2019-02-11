@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.random as npr
-import utils
+import trslds.utils as utils
 def initialize_dynamics( data, max_depth, max_epoch, batch_size, lr ):
     D_in = data[0][:, 0].size  # Dimension of latent space
 
