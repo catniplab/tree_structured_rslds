@@ -101,7 +101,7 @@ def plot_rotated_vf(trslds, transform, xmin=-15, xmax=15, ymin=-15, ymax=15, del
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111)
 
-    X, Y, arrows = plotting.rot_vector_field(trslds.Aleaf, trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth, trslds.leaf_path,
+    X, Y, arrows = plotting.rot_vector_field(trslds.Aleaf, trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth, trslds.leaf_paths,
                                              trslds.K, transform)
     norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
     U = arrows[:, :, 0] / norm
@@ -109,7 +109,7 @@ def plot_rotated_vf(trslds, transform, xmin=-15, xmax=15, ymin=-15, ymax=15, del
 
     ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
 
-    X, Y, color = plotting.rot_contour_plt(trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth, trslds.leaf_path,
+    X, Y, color = plotting.rot_contour_plt(trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth, trslds.leaf_paths,
                                            trslds.K, transform)
 
     for k in range(K):
@@ -129,7 +129,7 @@ def plot_rotated_vf(trslds, transform, xmin=-15, xmax=15, ymin=-15, ymax=15, del
 if __name__ == "__main__":
     #First generate data from true model
     no_realizations = 50
-    _, Y, _, true_model = simulate_tree_nascar(no_realizations)
+    Xtrue, Y, Ztrue, true_model = simulate_tree_nascar(no_realizations)
 
 
     "Lets see if we can learn the model using TrSLDS. First, let's initialize the parameters."
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     trslds = resample(no_samples, trslds)
 
    #Obtain transformation matrix from inferred latent space to true latent space
-    transform = utils.projection(true_model.x, trslds.x)
+    transform = utils.projection(Xtrue, trslds.x)
     Xinferr = trslds.x
     #Project inferred latent space to true latent space
     Xinferr = [transform[:, :-1] @ Xinferr[idx] + transform[:, -1][:, na] for idx in range(len(Xinferr))]
