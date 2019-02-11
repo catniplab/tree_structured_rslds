@@ -272,7 +272,7 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
 #            log_trans *= 0  # Erase previous entries in array
             
 #            log_trans = np.ones(K)
-            log_trans = 0 * log_trans + 1
+            log_trans = 0 * log_trans
             log_prior_prob = utils.compute_leaf_log_prob(R, X[idx][:, t], K, depth, leaf_path)
 
             # log_prior_prob = 0*log_trans
@@ -286,8 +286,8 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
             #             log_prior_prob[k] += np.log(utils.sigmoid(v))
             #         else:
             #             log_prior_prob[k] += np.log(utils.sigmoid(-v))
-            for k in range(K):
-                if t != X[idx][0, :].size - 1:
+            if t != X[idx][0, :].size - 1:
+                for k in range(K):
                     "Compute transition probability for each leaf"
                     log_trans[k] = utils.log_mvn(X[idx][:, t + 1], np.matmul(A[:, :-D_input, k], X[idx][:, t]) +
                                            np.matmul(A[:, -D_input:, k], U[idx][:, t]), Q[:, :, k], Qinv[:, :, k],
