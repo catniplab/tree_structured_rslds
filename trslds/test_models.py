@@ -22,7 +22,7 @@ depth, leaf_path, possible_paths, leaf_nodes = utils.create_balanced_binary_tree
 C = np.zeros((D_out, D_in + 1))
 C[:, :-1] = np.eye(D_out)
 C[0, 1] = 2
-S = .1 * np.eye(D_out)
+S = .001 * np.eye(D_out)
 
 #Create dynamics
 A = []
