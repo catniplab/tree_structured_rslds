@@ -62,3 +62,22 @@ for idx in range(len(Y)):
 no_samples = 200
 trslds = resample(no_samples, trslds)
 
+# In[]:
+# Obtain transformation matrix from inferred latent space to true latent space
+transform = utils.projection(Xtrue, trslds.x)
+Xinferr = trslds.x
+# Project inferred latent space to true latent space
+Xinferr = [transform[:, :-1] @ Xinferr[idx] + transform[:, -1][:, na] for idx in range(len(Xinferr))]
+Zinferr = trslds.z
+
+fig = plt.figure(figsize=(10, 10))
+ax = fig.add_subplot(111)
+for idx in tqdm(range(len(Y))):
+    ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 0)], Xinferr[idx][1, np.where(Zinferr[idx] == 0)],
+               color='green')
+    ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 1)], Xinferr[idx][1, np.where(Zinferr[idx] == 1)],
+               color='red')
+    ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 2)], Xinferr[idx][1, np.where(Zinferr[idx] == 2)],
+               color='blue')
+    ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 3)], Xinferr[idx][1, np.where(Zinferr[idx] == 3)],
+               color='purple')
