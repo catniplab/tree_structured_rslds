@@ -174,10 +174,10 @@ def compute_leaf_log_prob(R, x, K, depth, leaf_paths):
         "Compute prior probabilities of each path"
         for level in range(depth - 1):
             node = int(leaf_paths[level, k])
-            child = int(leaf_paths[level + 1, k])
+            child = leaf_paths[level + 1, k]
             if np.isnan(child) == False:
                 v = np.matmul(R[level][:-1, node - 1], x) + R[level][-1, node - 1]
-                if child % 2 == 1:  # If odd then you went left
+                if int(child) % 2 == 1:  # If odd then you went left
                     log_prob[k] += np.log(sigmoid(v))
                 else:
                     log_prob[k] += np.log(sigmoid(-v))
