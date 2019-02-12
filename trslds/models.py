@@ -84,7 +84,7 @@ class TroSLDS:
             self.nuy = D_out + 1
             self.lambday = 1e-8*np.eye(D_out)
             self.My = np.zeros((D_out, D_in + 1))
-            self.My[:, :-1] = 0.99*np.eye(D_out)
+            # self.My[:, :-1] = 0.99*np.eye(D_out)
             self.Vy = 1000*np.eye(D_in + 1)
         else:
             self.nuy = nuy

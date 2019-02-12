@@ -52,6 +52,7 @@ kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise':
           'scale': 0.8}
 trslds = TroSLDS(**kwargs) #Instantiiate the model
 
+
 #Add data to model
 for idx in range(len(Y)):
     trslds._add_data(X[idx], Y[idx], Z[idx], Path[idx])
