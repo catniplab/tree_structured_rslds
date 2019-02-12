@@ -7,7 +7,7 @@ from numpy import newaxis as na
 import scipy
 #To Do List:
 #1)Learn prior covariances
-#2)Consolidate pg functions into one
+#2)Allow for missing data
 #3)Allow each discrete state to have a correspodning emission parameter
 #4)Add recurrent dependecies
 class TroSLDS:

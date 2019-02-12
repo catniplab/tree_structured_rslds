@@ -128,10 +128,6 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
     boolean_mask = np.hstack(mask) #stack boolena mask
 
     #Mask missing spike trains
-#    X = X[:, boolean_mask[na, :]]
-#    Y = Y[:, boolean_mask[na, :]]
-#    W = W[:, boolean_mask[na, :]]
-
     X = X[:, boolean_mask]
     Y = Y[:, boolean_mask]
     W = W[:, boolean_mask]
@@ -211,12 +207,7 @@ def _internal_dynamics(Mprior, Vparent, Achild, Vchild, N=2):
     posterior_mu = posterior_sigma @ (precision_parent @ Mprior.flatten(order='F')[:, na] + 
                                       precision_child @ Achild.flatten(order='F')[:, na])
     return npr.multivariate_normal(posterior_mu.flatten(), posterior_sigma).reshape(Achild.shape, order='F')
-    "In updated version change this to make faster"
-#    posteriorV = np.linalg.inv(np.linalg.inv(Vparent) + np.linalg.inv(2 * Vchild))
-#    posteriorM = (posteriorV @ (np.linalg.solve(Vparent, Mprior) + np.linalg.solve(Vchild, Mprior))).T
 
-#    return npr.multivariate_normal(posteriorM.flatten(order='F'),
-#                                   np.kron(np.eye(Achild[:, 0].size, posteriorV))).reshape(Achild.shape, order='F')
 
 
 # In[7]:
@@ -259,7 +250,6 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
     :param D_input: dimension of input
     :return: Z, paths with sampled leaf nodes and paths.
     '''
-#    log_prior_prob = np.zeros(K)
     Qinv = Q + 0
     Qlogdet = np.ones(K)
     for k in range(K):
@@ -268,24 +258,10 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
     log_trans = np.ones(K)
     for idx in range(len(X)):
         for t in range(X[idx][0, :].size):
-#            log_prior_prob *= 0  # Erase previous entries in array
-#            log_trans *= 0  # Erase previous entries in array
-            
-#            log_trans = np.ones(K)
+
             log_trans = 0 * log_trans
             log_prior_prob = utils.compute_leaf_log_prob(R, X[idx][:, t], K, depth, leaf_path)
 
-            # log_prior_prob = 0*log_trans
-            # for k in range(K):
-            #     "Compute prior probabilities of each path"
-            #     for level in range(depth - 1):
-            #         node = int(leaf_path[level, k])
-            #         child = int(leaf_path[level + 1, k])
-            #         v = np.matmul(R[level][:-1, node - 1], X[idx][:, t]) + R[level][-1, node - 1]
-            #         if child % 2 == 1: #If odd then you went left
-            #             log_prior_prob[k] += np.log(utils.sigmoid(v))
-            #         else:
-            #             log_prior_prob[k] += np.log(utils.sigmoid(-v))
             if t != X[idx][0, :].size - 1:
                 for k in range(K):
                     "Compute transition probability for each leaf"
@@ -296,18 +272,10 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
             log_p = log_trans + log_prior_prob  # Sum up prior and transition
             post_unnorm = np.exp(log_p - np.max(log_p))
             post_p = post_unnorm / np.sum(post_unnorm)  # Normalize to make a valid density
-#            
-#            try:
-#                assert np.abs( np.sum(post_p) - 1) <= 1e-10
-#            except AssertionError:
-#                print(post_p)
-            #Obtain sample from posterior
-#            try:
+
             choice = npr.multinomial(1, post_p, size=1)
             paths[idx][:, t] = leaf_path[:, np.where(choice[0, :] == 1)[0][0]].ravel()
             Z[idx][t] = np.where(choice[0, :] == 1)[0][0]
-#            except IndexError:
-#                print(choice)
 
     return Z, paths
 
