@@ -190,7 +190,7 @@ for idx in range(len(Y)):
     trslds._add_data(X[idx], Y[idx], Z[idx], Path[idx])
 
 # Perform Gibbs to train the model
-no_samples = 100
+no_samples = 200
 trslds = resample(no_samples, trslds)
 
 # Obtain transformation matrix from inferred latent space to true latent space
