@@ -117,7 +117,7 @@ def sample_internal_dynamics(A, scale, Mx, Vx, depth):
                 for child in range(2):
                     Achild += A[level + 1][:, :, 2 * node + child]
 
-            A[level][:, :, node] = conditionals._internal_dynamics(Mprior, scale ** level * Vx, Achild,
+                A[level][:, :, node] = conditionals._internal_dynamics(Mprior, scale ** level * Vx, Achild,
                                                                    scale ** (level + 1) * Vx)
     return A
 

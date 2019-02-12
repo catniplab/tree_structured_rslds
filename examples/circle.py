@@ -23,27 +23,28 @@ def simulate_circle(no_realizations, Tmin=400, Tmax=800):
 
     # Define emission parameters
     C = np.zeros((D_out, D_in + 1))
-    C[:, :-1] = np.eye(D_out)
+    C[:, :-1] = 2*np.eye(D_out)
     C[0, 1] = 2
     S = .001 * np.eye(D_out)
 
     # Create dynamics
     theta_1 = -.15 * np.pi / 2
     theta_2 = -.05 * np.pi / 2
-    theta_3 = -.5*np.pi/2
+    theta_3 = -.35*np.pi/2
 
     A = []
     A.append(np.zeros((D_in, D_in + 1, 1)))
 
     At = np.zeros((D_in, D_in + 1, 2))
-    At[:, :-1, 1] = np.array([[np.cos(theta_3), -np.sin(theta_3)], [np.sin(theta_3), np.cos(theta_3)]])
+    At[:, :-1, 0] = np.array([[np.cos(theta_3), -np.sin(theta_3)], [np.sin(theta_3), np.cos(theta_3)]])
+    At[:, :, 1] *= np.nan
     A.append(np.zeros((D_in, D_in + 1, 2)))
 
     At = np.zeros((D_in, D_in + 1, 4))
-    At[:, :-1, 0] = np.array([[np.cos(theta_1), -np.sin(theta_1)], [np.sin(theta_1), np.cos(theta_1)]])
-    At[:, :-1, 1] = np.array([[np.cos(theta_2), -np.sin(theta_2)], [np.sin(theta_2), np.cos(theta_2)]])
-    At[:, :, 2] *= np.nan
-    At[:, :, 3] *= np.nan
+    At[:, :, 0] *= np.nan
+    At[:, :, 1] *= np.nan
+    At[:, :-1, 2] = np.array([[np.cos(theta_1), -np.sin(theta_1)], [np.sin(theta_1), np.cos(theta_1)]])
+    At[:, :-1, 3] = np.array([[np.cos(theta_2), -np.sin(theta_2)], [np.sin(theta_2), np.cos(theta_2)]])
     A.append(At)
 
     Q = np.repeat(.001 * np.eye(D_in)[:, :, na], K, axis=2)  # Noise covariance
@@ -56,8 +57,8 @@ def simulate_circle(no_realizations, Tmin=400, Tmax=800):
     R = []
     R.append(R_par)
     R_temp = np.zeros((D_in + 1, 2))
-    R_temp[:-1, 0] = np.array([-100, 100])  # Left hyperplane
-    R_temp[:-1, 1] *= np.nan  # Right hyperplane
+    R_temp[:, 0] *= np.nan  # Left hyperplane
+    R_temp[:-1, 1] = np.array([-100, 100])  # Right hyperplane
     R.append(R_temp)
 
     kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Q, 'emission': C,
@@ -70,7 +71,7 @@ def simulate_circle(no_realizations, Tmin=400, Tmax=800):
     Xreal = []
     Yreal = []
     Zreal = []
-    starting_pts = npr.uniform(-10, 10, (D_in, no_realizations))
+    starting_pts = npr.uniform(-5, 5, (D_in, no_realizations))
     for reals in tqdm(range(no_realizations)):
         T = npr.randint(Tmin, Tmax + 1)
         y, x, z = true_model._generate_data(T, starting_pts[:, reals])
@@ -129,14 +130,82 @@ if __name__ == "__main__":
     Xtrue, Y, Ztrue, true_model = simulate_circle(no_realizations)
 
 
+# In[]:
     #Plot trajectories
-    for reals in range(no_realizations):
-        fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(111)
-        for idx in tqdm(range(no_realizations)):
-            ax.scatter(Xtrue[idx][0, np.where(Ztrue[idx] == 0)], Xtrue[idx][1, np.where(Ztrue[idx] == 0)],
-                       color='green')
-            ax.scatter(Xtrue[idx][0, np.where(Ztrue[idx] == 1)], Xtrue[idx][1, np.where(Ztrue[idx] == 1)],
-                       color='red')
-            ax.scatter(Xtrue[idx][0, np.where(Ztrue[idx] == 2)], Xtrue[idx][1, np.where(Ztrue[idx] == 2)],
-                       color='blue')
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)
+    for idx in tqdm(range(no_realizations)):
+        ax.scatter(Xtrue[idx][0, np.where(Ztrue[idx] == 0)], Xtrue[idx][1, np.where(Ztrue[idx] == 0)],
+                   color='green')
+        ax.scatter(Xtrue[idx][0, np.where(Ztrue[idx] == 1)], Xtrue[idx][1, np.where(Ztrue[idx] == 1)],
+                   color='red')
+        ax.scatter(Xtrue[idx][0, np.where(Ztrue[idx] == 2)], Xtrue[idx][1, np.where(Ztrue[idx] == 2)],
+                   color='blue')
+    ax.set_title('true latents')
+    fig.show()
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+# In[]
+    "Lets see if we can learn the model using TrSLDS. First, let's initialize the parameters."
+    batch_size = 256
+    max_epochs = 100
+    lr = 1e-3
+    A, C, R, X, Z, Path, possible_paths, leaf_path, leaf_nodes = init.initialize(Y, D_in, K, max_epochs, batch_size,
+                                                                                 lr)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for idx in range(no_realizations):
+        ax.scatter(X[idx][0, :], X[idx][1, :])
+    ax.set_title('pca latents')
+    fig.show()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for idx in range(no_realizations):
+        ax.scatter(Y[idx][0, np.where(Ztrue[idx][:-1] == 0)], Y[idx][1, np.where(Ztrue[idx][:-1] == 0)],
+                   color='green')
+        ax.scatter(Y[idx][0, np.where(Ztrue[idx][:-1] == 1)], Y[idx][1, np.where(Ztrue[idx][:-1] == 1)],
+                   color='red')
+        ax.scatter(Y[idx][0, np.where(Ztrue[idx][:-1] == 2)], Y[idx][1, np.where(Ztrue[idx][:-1] == 2)],
+                   color='blue')
+    ax.set_title('Observations')
+    fig.show()
+    Qstart = np.repeat(np.eye(D_in)[:, :, na], K, axis=2)
+    Sstart = np.eye(D_out)
+
+# In[]
+    kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Qstart, 'emission': C,
+              'emission_noise': Sstart,
+              'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path, 'leaf_nodes': leaf_nodes,
+              'scale': 0.5}
+    trslds = TroSLDS(**kwargs)  # Instantiiate the model
+
+    # Add data to model
+    for idx in range(len(Y)):
+        trslds._add_data(X[idx], Y[idx], Z[idx], Path[idx])
+
+    # Perform Gibbs to train the model
+    no_samples = 1
+    trslds = resample(no_samples, trslds)
+
+    # Obtain transformation matrix from inferred latent space to true latent space
+    transform = utils.projection(Xtrue, trslds.x)
+    Xinferr = trslds.x
+    # Project inferred latent space to true latent space
+    Xinferr = [transform[:, :-1] @ Xinferr[idx] + transform[:, -1][:, na] for idx in range(len(Xinferr))]
+    Zinferr = trslds.z
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)
+    for idx in tqdm(range(no_realizations)):
+        ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 0)], Xinferr[idx][1, np.where(Zinferr[idx] == 0)],
+                   color='green')
+        ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 1)], Xinferr[idx][1, np.where(Zinferr[idx] == 1)],
+                   color='red')
+        ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 2)], Xinferr[idx][1, np.where(Zinferr[idx] == 2)],
+                   color='blue')
+        ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 3)], Xinferr[idx][1, np.where(Zinferr[idx] == 3)],
+                   color='purple')
+    fig.show()
+    # Plot rotated vector field colored by probability of latent discrete state assignment
+    plot_rotated_vf(trslds, transform, xmin=-7, xmax=7, ymin=-7, ymax=7, delta=0.1)
