@@ -214,8 +214,9 @@ class TroSLDS:
             self._sample_pg()  # sample polya-gamma associated with tree
             self._sample_spike_pg()  # sample polya-gamma associated with spikes
             self.x = conditionals.pg_kalman_spike(self.D_in, self.D_bias, self.x, self.u, P, self.Aleaf, self.Q,
-                                                  self.C, self.y, self.path, self.z, self.omega, self.spike_omega,
-                                                  self.alphas, self.covs, self.R, self.depth)
+                                                  self.C, 0, self.y, self.path, self.z, self.omega,
+                                                  self.alphas, self.covs, self.R, self.depth, self.spike_omega,
+                                                  self.bern)
         else:  # If outputs are gaussian
             self._sample_pg()
             self.x = conditionals.pg_kalman(self.D_in, self.D_bias, self.x, self.u, P, self.Aleaf, self.Q, self.C,
