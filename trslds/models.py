@@ -187,7 +187,7 @@ class TroSLDS:
                                                     self.Mx, self.Vx, self.scale, self.leaf_nodes)
         self._obtain_leaf_dynamics()
         #Sample dynamics of internal nodes
-        self.A = utils.sample_internal_dynamics(self.A, self.scale, self.My, self.Vx, self.depth)
+        self.A = utils.sample_internal_dynamics(self.A, self.scale, self.Mx, self.Vx, self.depth)
 
 # In[6]:
     def _sample_discrete_latent(self):
