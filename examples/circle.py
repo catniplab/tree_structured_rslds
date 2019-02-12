@@ -215,5 +215,6 @@ fig.show()
 # Plot rotated vector field colored by probability of latent discrete state assignment
 plot_rotated_vf(trslds, transform, xmin=-7, xmax=7, ymin=-7, ymax=7, delta=0.1)
 
+#Plot true vector field
 transform_t = np.hstack((np.eye(2), np.zeros((2, 1))))
 plot_rotated_vf(true_model, transform_t, xmin=-7, xmax=7, ymin=-7, ymax=7, delta=0.1)
