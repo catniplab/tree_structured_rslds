@@ -82,4 +82,4 @@ for idx in tqdm(range(len(Y))):
                color='blue')
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 3)], Xinferr[idx][1, np.where(Zinferr[idx] == 3)],
                color='purple')
-fug
+fig.show()
