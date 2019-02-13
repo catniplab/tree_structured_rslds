@@ -22,6 +22,7 @@ def resample(no_samples, trslds):
         trslds._sample_dynamics()  # Sample dynamics of tree
         trslds._sample_discrete_latent()  # Sample discrete latent states
         trslds._sample_continuous_latent()  # Sample continuous latent state
+    return trslds
 
 
 
@@ -81,3 +82,4 @@ for idx in tqdm(range(len(Y))):
                color='blue')
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 3)], Xinferr[idx][1, np.where(Zinferr[idx] == 3)],
                color='purple')
+fug
