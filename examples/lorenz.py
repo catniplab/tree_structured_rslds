@@ -5,6 +5,7 @@ from trslds.models import TroSLDS
 from numpy import newaxis as na
 from trslds import utils
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from trslds import initialize as init
 from trslds import plotting
 import seaborn as sns
@@ -64,7 +65,6 @@ no_samples = 200
 trslds = resample(no_samples, trslds)
 
 # In[]:
-from mpl_toolkits.mplot3d import Axes3D
 
 # Obtain transformation matrix from inferred latent space to true latent space
 transform = utils.projection(Xtrue, trslds.x)
