@@ -316,3 +316,34 @@ def projection(xreal, xinferr):
     Xrot = np.hstack((Xrot, np.ones((Xrot[:, 0].size, 1))))
     transform = np.linalg.lstsq(Xrot, Xreals)[0].T
     return transform
+
+# In[]:
+def generate_trajectory(A, Q, R, starting_pt, depth, leaf_path, K, T, D_in, noise=True, u=None, D_bias=None):
+    if u is D_bias is None:
+            u = np.ones((1, T))
+            D_bias = 1
+    x = np.zeros((D_in, T + 1))
+    x[:, 0] = starting_pt
+    z = np.zeros(T + 1).astype(int)
+    for t in range(T):
+        log_p = compute_leaf_log_prob(R, x[:, t], K, depth, leaf_path)
+        p_unnorm = np.exp(log_p - np.max(log_p))
+        p = p_unnorm/np.sum(p_unnorm)
+        if noise:  # Stochastically choose the discrete latent and add noise to continuous latent
+                choice = npr.multinomial(1, p.ravel(), size=1)
+                z[t] = np.where(choice[0, :] == 1)[0][0].astype(int)
+                x[:, t + 1] = (A[:, :-D_bias, z[t]] @ x[:, t][:, na] +  \
+                              A[:, -D_bias:, z[t]] @ u[:, t][:, na] + \
+                              npr.multivariate_normal(np.zeros(D_in), Q[:, :, z[t]])[:, na]).flatten()
+
+        else:  # Use Bayes classifier to choose discrete latent state and add no noise to continuous latent states
+            z[t] = np.argmax(choice)
+            x[:, t + 1] = (A[:, :-D_bias, z[t]] @ x[:, t][:, na] + \
+                           A[:, -D_bias:, z[t]] @ u[:, t][:, na]).flatten()
+
+    log_p = compute_leaf_log_prob(R, x[:, -1], K, depth, leaf_path)
+    p_unnorm = np.exp(log_p - np.max(log_p))
+    p = p_unnorm / np.sum(p_unnorm)
+    choice = npr.multinomial(1, p.ravel(), size=1)
+    z[-1] = np.where(choice[0, :] == 1)[0][0]
+    return x, z
