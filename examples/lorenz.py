@@ -64,6 +64,8 @@ no_samples = 200
 trslds = resample(no_samples, trslds)
 
 # In[]:
+from mpl_toolkits.mplot3d import Axes3D
+
 # Obtain transformation matrix from inferred latent space to true latent space
 transform = utils.projection(Xtrue, trslds.x)
 Xinferr = trslds.x
@@ -72,14 +74,25 @@ Xinferr = [transform[:, :-1] @ Xinferr[idx] + transform[:, -1][:, na] for idx in
 Zinferr = trslds.z
 
 fig = plt.figure(figsize=(10, 10))
-ax = fig.add_subplot(111)
+ax = fig.add_subplot(111, projection='3d')
 for idx in tqdm(range(len(Y))):
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 0)], Xinferr[idx][1, np.where(Zinferr[idx] == 0)],
-               color='green')
+               Xinferr[idx][2, np.where(Zinferr[idx] == 0)], color='green')
+
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 1)], Xinferr[idx][1, np.where(Zinferr[idx] == 1)],
-               color='red')
+               Xinferr[idx][2, np.where(Zinferr[idx] == 1)], color='red')
+
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 2)], Xinferr[idx][1, np.where(Zinferr[idx] == 2)],
-               color='blue')
+               Xinferr[idx][2, np.where(Zinferr[idx] == 2)], color='blue')
+
     ax.scatter(Xinferr[idx][0, np.where(Zinferr[idx] == 3)], Xinferr[idx][1, np.where(Zinferr[idx] == 3)],
-               color='purple')
+               Xinferr[idx][2, np.where(Zinferr[idx] == 3)], color='purple')
+fig.show()
+
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+for idx in range(len(Xtrue)):
+    ax.plot(Xtrue[idx][0, :], Xtrue[idx][1, :], Xtrue[idx][2, :])
+
 fig.show()
