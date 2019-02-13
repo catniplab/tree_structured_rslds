@@ -9,7 +9,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from trslds import initialize as init
 from trslds import plotting
 import seaborn as sns
-color_names = ["windows blue", "leaf green","red", "orange"]
+color_names = ["dirty yellow", "leaf green","red", "orange"]
+
 colors_leaf = sns.xkcd_palette(color_names)
 npr.seed(0)
 
@@ -61,7 +62,7 @@ for idx in range(len(Y)):
 
 
 #Perform Gibbs to train the model
-no_samples = 200
+no_samples = 500
 trslds = resample(no_samples, trslds)
 
 # In[]:
@@ -96,3 +97,47 @@ for idx in range(len(Xtrue)):
     ax.plot(Xtrue[idx][0, :], Xtrue[idx][1, :], Xtrue[idx][2, :])
 
 fig.show()
+
+
+# In[]:
+import matplotlib.gridspec as gridspec
+#Make ICLR figure
+fig = plt.figure()
+gs = gridspec.GridSpec(2, 2)
+
+"Real trajectories"
+ax1 = fig.add_subplot(gs[0, 0], projection='3d')
+
+for idx in range(len(Xtrue)):
+    ax1.plot(Xtrue[idx][0, :], Xtrue[idx][1, :], Xtrue[idx][2, :])
+    ax1.scatter(Xtrue[idx][0, 0], Xtrue[idx][1, 0], Xtrue[idx][2, 0], marker='x', color='red', s=40)
+ax1.set_title('true latent trajectories')
+ax1.set_yticklabels([])
+ax1.set_xticklabels([])
+ax1.set_zticklabels([])
+xlim = ax1.get_xlim()
+ylim = ax1.get_ylim()
+zlim = ax1.get_zlim()
+ax1.set_xlabel('$x_1$', labelpad= 0, fontsize = 16)
+ax1.set_ylabel('$x_2$', labelpad= .5, fontsize = 16)
+ax1.set_zlabel('$x_3$', labelpad= 0, horizontalalignment='center', fontsize = 16)
+
+"Plot inferred trajectories colored by inferred discrete latent states"
+ax = fig.add_subplot(gs[1, 0], projection='3d')
+for idx in tqdm(range(len(Xinferr))):
+    for t in range(X[idx][0, :].size):
+        ax.plot(Xinferr[idx][0, t:t+2], Xinferr[idx][1, t:t+2], Xinferr[idx][2, t:t+2], color=colors_leaf[int(Z[idx][t])])
+fig.show()
+
+
+
+"Plot generated trajectories from leaf node"
+_, xnew, znew = trslds._generate_data(5000, X[2][:, 2], )
+xnew = transform[:, :-1] @ xnew + transform[:, -1][:, na]
+ax = fig.add_subplot(gs[0, 1], projection='3d')
+ax.cla()
+for t in range(xnew[0, :].size):
+    ax.plot(xnew[0, t:t+2], xnew[1, t:t+2], xnew[2, t:t+2], color=colors_leaf[int(znew[t])])
+fig.show()
+
+
