@@ -9,7 +9,7 @@ A priori, it is natural to expect that locally linear dynamics of nearby regions
 in the context of tree-structured stick breaking, we impose that partitions that share a common parent
 should have similar dynamics. We explicitly model this by enforcing a hierarchical prior on the dynamics that respects the tree structure which allows for a multi-scale view of the system. 
       
-The model is efficenitly learned through Gibbs sampling. Details of the algorithm can be found [here](https://openreview.net/forum?id=HkzRQhR9YX&noteId=HJeZ36huRX).
+The model is efficenitly learned through Gibbs sampling. Details of the algorithm can be found [here](https://openreview.net/forum?id=HkzRQhR9YX).
 
 # Installation
 This package is built upon the following two packages:
