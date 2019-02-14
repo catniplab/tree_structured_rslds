@@ -11,6 +11,8 @@ from trslds import initialize as init
 from trslds import plotting
 import copy
 import seaborn as sns
+from scipy.integrate import odeint
+
 color_names = ["dirty yellow", "leaf green","red", "orange"]
 
 colors_leaf = sns.xkcd_palette(color_names)
@@ -64,7 +66,7 @@ for idx in range(len(Y)):
 
 # In[]
 #Perform Gibbs to train the model
-no_samples = 100
+no_samples = 1
 trslds = resample(no_samples, trslds)
 
 # In[]:
@@ -102,36 +104,11 @@ fig.show()
 
 # In[]:
 "Perform Gibbs sampling to get MAP estimate of conditional posteriors of dynamics"
-A_est = []
-Q_est = []
-no_samples = 5000
-At = copy.deepcopy(trslds.A)
-Qt = copy.deepcopy(trslds.Q)
-for m in tqdm(range(no_samples)):
-    At, Qt = utils.sample_leaf_dynamics(trslds.x, trslds.u, trslds.z, At, Qt, trslds.nux, 
-                                        trslds.lambdax, trslds.Mx, trslds.Vx, trslds.scale, trslds.leaf_nodes)
-    At = utils.sample_internal_dynamics(At, trslds.scale, trslds.Mx, trslds.Vx, trslds.depth)
-    if m > no_samples/2:
-        A_est.append(copy.deepcopy(At))
-        Q_est.append(copy.deepcopy(Qt))
-
-#Take average of samples
-Z = len(A_est)
-#Take sample mean as estimate
-for d in range(trslds.depth):
-    for node in range(2**d):
-        At[d][:,:,node] = A_est[0][d][:,:,node]/Z
-Qt = Q_est[0]/Z
-for sample in tqdm(range(1, len(A_est))):
-    for k in range(K):
-        Qt[:,:,k] += Q_est[sample][:,:,k]/Z
-    #Take sample mean as estimate
-    for d in range(trslds.depth):
-        for node in range(2**d):
-            At[d][:,:,node] += A_est[sample][d][:,:,node]/Z
+At, Qt = utils.MAP_dynamics(trslds.x, trslds.u, trslds.z, trslds.A, trslds.Q, trslds.nux, trslds.lambdax, 
+                      trslds.Mx, trslds.Vx, trslds.scale, trslds.leaf_nodes, K, trslds.depth, 5000)
 # In[]:
 #Make ICLR figure
-fig = plt.figure()
+fig = plt.figure(figsize=(20, 20))
 gs = gridspec.GridSpec(2, 2)
 
 "Real trajectories"
@@ -140,7 +117,7 @@ ax1 = fig.add_subplot(gs[0, 0], projection='3d')
 for idx in range(len(Xtrue)):
     ax1.plot(Xtrue[idx][0, :], Xtrue[idx][1, :], Xtrue[idx][2, :])
     ax1.scatter(Xtrue[idx][0, 0], Xtrue[idx][1, 0], Xtrue[idx][2, 0], marker='x', color='red', s=40)
-ax1.set_title('true latent trajectories')
+ax1.set_title('true latent trajectories', fontsize=20)
 ax1.set_yticklabels([])
 ax1.set_xticklabels([])
 ax1.set_zticklabels([])
@@ -156,7 +133,31 @@ ax = fig.add_subplot(gs[1, 0], projection='3d')
 for idx in tqdm(range(len(Xinferr))):
     for t in range(Xinferr[idx][0, :].size):
         ax.plot(Xinferr[idx][0, t:t+2], Xinferr[idx][1, t:t+2], Xinferr[idx][2, t:t+2], color=colors_leaf[int(Zinferr[idx][t])])
+ax.set_yticklabels([])
+ax.set_xticklabels([])
+ax.set_zticklabels([])
+ax.set_xlim(xlim)
+ax.set_ylim(ylim)
+ax.set_zlim(zlim)
+ax.set_xlabel('$x_1$', labelpad= 0, fontsize = 16)
+ax.set_ylabel('$x_2$', labelpad= .5, fontsize = 16)
+ax.set_zlabel('$x_3$', labelpad= 0, horizontalalignment='center', fontsize = 16)
+ax.set_title('Inferred Latent States', fontsize = 20)
 
+
+"Simulate a lorenz attractor as reference"
+pt = 2*np.linalg.solve(transform[:, :-1], trslds.x[2][:, 2] - transform[:, -1])
+rho = 28.0
+sigma = 10.0
+beta = 8.0 / 3.0
+
+def f(state, t):
+  x, y, z = state  # unpack the state vector
+  return sigma * (y - x), x * (rho - z) - y, x * y - beta * z  # derivatives
+
+
+t = np.arange(0.0, 50.01, .01)
+states = ( odeint(f, pt, t)/2 ).T
 
 
 "Plot generated trajectories from second level"
@@ -170,7 +171,14 @@ ax = fig.add_subplot(gs[0, 1], projection='3d')
 ax.cla()
 for t in range(xnew[0, :].size):
     ax.plot(xnew[0, t:t+2], xnew[1, t:t+2], xnew[2, t:t+2], color=colors_leaf[int(znew[t])])
-
+ax.plot(states[0,:], states[1,:], states[2,:], color="slategray", alpha = 0.75)
+ax.set_yticklabels([])
+ax.set_xticklabels([])
+ax.set_zticklabels([])
+ax.set_xlabel('$x_1$', labelpad= 0, fontsize = 16)
+ax.set_ylabel('$x_2$', labelpad= .5, fontsize = 16)
+ax.set_zlabel('$x_3$', labelpad= 0, horizontalalignment='center', fontsize = 16)
+ax.set_title('Realization from level 2', fontsize = 20)
 
 "Plot generated trajectories from leaf node"
 #_, xnew, znew = trslds._generate_data(5000, X[2][:, 2], )
@@ -180,6 +188,16 @@ ax = fig.add_subplot(gs[1, 1], projection='3d')
 ax.cla()
 for t in range(xnew[0, :].size):
     ax.plot(xnew[0, t:t+2], xnew[1, t:t+2], xnew[2, t:t+2], color=colors_leaf[int(znew[t])])
-
+ax.plot(states[0,:], states[1,:], states[2,:], color="slategray", alpha = 0.75)
+ax.set_xlim(xlim)
+ax.set_ylim(ylim)
+ax.set_zlim(zlim)
+ax.set_yticklabels([])
+ax.set_xticklabels([])
+ax.set_zticklabels([])  
+ax.set_xlabel('$x_1$', labelpad= 0, fontsize = 16)
+ax.set_ylabel('$x_2$', labelpad= .5, fontsize = 16)
+ax.set_zlabel('$x_3$', labelpad= 0, horizontalalignment='center', fontsize = 16)
+ax.set_title('Realization from leaf nodes', fontsize = 20)
 fig.show()
-
+fig.tight_layout()
