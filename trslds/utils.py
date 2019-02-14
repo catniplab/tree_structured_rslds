@@ -379,3 +379,12 @@ def MAP_dynamics(x, u, z, Ainit, Qinit, nux, lambdax, Mx, Vx, scale, leaf_nodes,
             for node in range(2**d):
                 At[d][:,:,node] += A_est[sample][d][:,:,node]/Z
     return At, Qt
+
+# In[]:
+def gaussian_kernel_smoother(y, sigma, window):
+    b = gaussian(window, sigma)
+    y_smooth = np.zeros(y.shape)
+    neurons = y[:, 0].size
+    for neuron in range(neurons):
+        y_smooth[neuron, :] = filters.convolve1d(y[neuron, :], b)/b.sum()
+    return y_smooth
