@@ -351,36 +351,6 @@ def generate_trajectory(A, Q, R, starting_pt, depth, leaf_path, K, T, D_in, nois
     return x, z
 
 # In[]:
-#def MAP_dynamics(no_samples, trslds):
-#    A_est = []
-#    Q_est = []
-#    At = copy.deepcopy(trslds.A)
-#    Qt = copy.deepcopy(trslds.Q)
-#    for m in tqdm(range(no_samples)):
-#        At, Qt = sample_leaf_dynamics(trslds.x, trslds.u, trslds.z, At, Qt, trslds.nux, 
-#                                            trslds.lambdax, trslds.Mx, trslds.Vx, trslds.scale, trslds.leaf_nodes)
-#        At = sample_internal_dynamics(At, trslds.scale, trslds.Mx, trslds.Vx, trslds.depth)
-#        if m > no_samples/2:
-#            A_est.append(copy.deepcopy(At))
-#            Q_est.append(copy.deepcopy(Qt))
-#    
-#    #Take average of samples
-#    Z = len(A_est)
-#    #Take sample mean as estimate
-#    for d in range(trslds.depth):
-#        for node in range(2**d):
-#            At[d][:,:,node] = A_est[0][d][:,:,node]/Z
-#    Qt = Q_est[0]/Z
-#    for sample in tqdm(range(1, len(A_est))):
-#        for k in range(trslds.K):
-#            Qt[:,:,k] += Q_est[sample][:,:,k]/Z
-#        #Take sample mean as estimate
-#        for d in range(trslds.depth):
-#            for node in range(2**d):
-#                At[d][:,:,node] += A_est[sample][d][:,:,node]/Z
-#    return At, Qt
-
-
 def MAP_dynamics(x, u, z, Ainit, Qinit, nux, lambdax, Mx, Vx, scale, leaf_nodes, K, depth, no_samples):
     A_est = []
     Q_est = []
