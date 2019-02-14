@@ -76,21 +76,54 @@ K = 4
 no_realizations = 100
 T = 400
 dt = 0.1
-starting_pts = 6*npr.rand((D_in, no_realizations)) - 3
-C = np.hstack((2*npr.rand(D_out, D_in)-1, np.zeros((D_out,1))))
-X = []
+starting_pts = 6*npr.rand(D_in, no_realizations) - 3
+C = np.hstack((2*npr.rand(D_out, D_in) - 1, np.zeros((D_out,1))))
+Xtrue = []
 Y = []
 Ysmooth = []
+fig = plt.figure()
+ax = fig.add_subplot(111)
 for idx in range(D_out):
     xt = noisy_FitzHugh(dt, T, starting_pts[:, idx])
-    X.append(xt + 0)
-    P = 1/(1 + np.exp(-(C[:, :-1] @ xt + C[:, -1][:, na])))
+    #Demean 
+    xt = xt - np.mean(xt, axis=1)[:, na]
+    Xtrue.append(xt + 0)
+    P = 1/(1 + np.exp(-(C[:, :-1] @ xt[:, 1:] + C[:, -1][:, na])))
     yt = npr.binomial( 1, P)
     Y.append(yt + 0)
     #Smooth using gaussian kernel smoother
     sigma = 25
-    window = 100
+    window = 400
     ysmooth = utils.gaussian_kernel_smoother(yt, sigma, window)
     Ysmooth.append(ysmooth + 0)
+    ax.plot(ysmooth[0, :])
+
+
+# In[]:
+"Initalize values"
+max_epochs = 1
+batch_size = 128
+lr = 0.0001
+#Instead of passing in spikes, pass in smoothed spikes to do PCA on
+A, C, R, X, Z, Path, possible_paths, leaf_path, leaf_nodes = init.initialize(Ysmooth, D_in, K, max_epochs, batch_size,
+                                                                             lr)
+Qstart = np.repeat(np.eye(D_in)[:, :, na], K, axis=2)
+Sstart = np.eye(D_out)
+
+kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Qstart, 'emission': C,
+          'emission_noise': Sstart,
+          'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path, 'leaf_nodes': leaf_nodes,
+          'scale': 0.01}
+trslds = TroSLDS(**kwargs) #Instantiiate the model
+
+
+#Add data to model
+for idx in range(len(Y)):
+    trslds._add_data(X[idx], Y[idx], Z[idx], Path[idx])
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+for idx in range(len(X)):
+    ax.plot(X[idx][0, 1:], X[idx][1, 1:])
     
     
