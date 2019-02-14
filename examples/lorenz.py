@@ -66,7 +66,7 @@ for idx in range(len(Y)):
 
 # In[]
 #Perform Gibbs to train the model
-no_samples = 1
+no_samples = 100
 trslds = resample(no_samples, trslds)
 
 # In[]:
@@ -146,7 +146,7 @@ ax.set_title('Inferred Latent States', fontsize = 20)
 
 
 "Simulate a lorenz attractor as reference"
-pt = 2*np.linalg.solve(transform[:, :-1], trslds.x[2][:, 2] - transform[:, -1])
+pt = (transform[:, :-1] @ trslds.x[2][:, 2][:, na] + transform[:, -1][:, na]).flatten()
 rho = 28.0
 sigma = 10.0
 beta = 8.0 / 3.0
@@ -157,7 +157,7 @@ def f(state, t):
 
 
 t = np.arange(0.0, 50.01, .01)
-states = ( odeint(f, pt, t)/2 ).T
+states = ( odeint(f, 2*pt, t)/2 ).T
 
 
 "Plot generated trajectories from second level"
