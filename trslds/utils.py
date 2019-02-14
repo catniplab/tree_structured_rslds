@@ -8,6 +8,8 @@ from torch.autograd import Variable
 import torch.optim as optim
 import copy
 from tqdm import tqdm
+from scipy.ndimage import filters
+from scipy.signal import gaussian
 # In[1]:
 def compute_ss_mniw(X, Y, nu, Lambda, M, V ):
     '''
