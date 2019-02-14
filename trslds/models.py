@@ -71,7 +71,7 @@ class TroSLDS:
             self.lambdax = 1e-8*np.eye(D_in)
             self.Mx = np.zeros((D_in, D_in + D_bias))
             self.Mx[:, :-D_bias] = 0.99 * np.eye(D_in)
-            self.Vx = 1000*np.eye(D_in + D_bias)
+            self.Vx = 100*np.eye(D_in + D_bias)
         else:
             self.nux = nu
             assert nu > D_in
@@ -85,7 +85,7 @@ class TroSLDS:
             self.lambday = 1e-8*np.eye(D_out)
             self.My = np.zeros((D_out, D_in + 1))
             # self.My[:, :-1] = 0.99*np.eye(D_out)
-            self.Vy = 1000*np.eye(D_in + 1)
+            self.Vy = 100*np.eye(D_in + 1)
         else:
             self.nuy = nuy
             assert nuy > D_out
