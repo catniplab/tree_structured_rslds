@@ -9,7 +9,18 @@ A priori, it is natural to expect that locally linear dynamics of nearby regions
 in the context of tree-structured stick breaking, we impose that partitions that share a common parent
 should have similar dynamics. We explicitly model this by enforcing a hierarchical prior on the dynamics that respects the tree structure which allows for a multi-scale view of the system. 
       
-The model is efficenitly learned through Gibbs sampling. Details of the algorithm can be found [here](https://openreview.net/forum?id=HkzRQhR9YX).
+The model is efficenitly learned through Gibbs sampling. Complete details of the algorithm are given in the following paper:
+````
+@InProceedings{Nassar2018b,
+author        = {Josue Nassar and Scott W. Linderman and Monica Bugallo and Il Memming Park},
+title         = {Tree-Structured Recurrent Switching Linear Dynamical Systems for Multi-Scale Modeling},
+booktitle     = {International Conference on Learning Representations (ICLR)},
+year          = {2019},
+url           = {https://openreview.net/pdf?id=HkzRQhR9YX},
+}
+````
+
+Here is a [link to the ICLR paper](https://openreview.net/pdf?id=HkzRQhR9YX).
 
 # Installation
 This package is built upon the following two packages:
@@ -19,4 +30,4 @@ github.com/pytorch/pytorch
 ````
 
 # Usage
-To get started, please see the tutorial.
+To get started, check out the [lorenz example](/examples/lorenz.py) which will fit a tree-structured recurrent switching linear dynamical system to a lorenz attractor, similar to Figure 3 of the ICLR paper.
