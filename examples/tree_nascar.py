@@ -5,6 +5,7 @@ from trslds.models import TroSLDS
 from numpy import newaxis as na
 from trslds import utils
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 from trslds import initialize as init
 from trslds import plotting
 import seaborn as sns
@@ -95,36 +96,6 @@ def resample(no_samples, trslds):
 
     return trslds
 
-def plot_rotated_vf(trslds, transform, xmin=-15, xmax=15, ymin=-15, ymax=15, delta=0.1):
-
-    # Plot vector field and probability contour plot of inferred model projected onto true latent space
-    fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(111)
-
-    X, Y, arrows = plotting.rot_vector_field(trslds.Aleaf, trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth, trslds.leaf_paths,
-                                             trslds.K, transform)
-    norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
-    U = arrows[:, :, 0] / norm
-    V = arrows[:, :, 1] / norm
-
-    ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
-
-    X, Y, color = plotting.rot_contour_plt(trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth, trslds.leaf_paths,
-                                           trslds.K, transform)
-
-    for k in range(K):
-        start = np.array([1., 1., 1., 0.])
-        end = np.concatenate((colors_leaf[k], [0.5]))
-        cmap = plotting.gradient_cmap([start, end])
-        im1 = ax.imshow(color[:, :, k],
-                        extent=[xmin, xmax, ymin, ymax],
-                        vmin=0, vmax=1, cmap=cmap, origin='lower')
-        ax.set_aspect('auto')
-    ax.set_xlim([xmin, xmax])
-    ax.set_ylim([ymin, ymax])
-
-    fig.show()
-
 # In[]:
 if __name__ == "__main__":
     #First generate data from true model
@@ -163,5 +134,147 @@ if __name__ == "__main__":
     Xinferr = [transform[:, :-1] @ Xinferr[idx] + transform[:, -1][:, na] for idx in range(len(Xinferr))]
     Zinferr = trslds.z
 
-    #Plot rotated vector field colored by probability of latent discrete state assignment
-    plot_rotated_vf(trslds, transform, xmin=-15, xmax=15, ymin=-15, ymax=15, delta=0.1)
+# In[]:
+    "Get the mode of the conditional posterior over the dynamics"
+    At, Qt = utils.MAP_dynamics(trslds.x, trslds.u, trslds.z, trslds.A, trslds.Q, trslds.nux, trslds.lambdax,
+                                trslds.Mx, trslds.Vx, trslds.scale, trslds.leaf_nodes, K, trslds.depth, 10000)
+
+# In[]:
+    fig = plt.figure()
+    gs = gridspec.GridSpec(2, 3)
+
+    # Plot true latent states colored by true discrete state
+    ax = fig.add_subplot(gs[0, 0])
+    for idx in tqdm(range(len(Xtrue))):
+        for t in range(Xtrue[idx][0, :]):
+            ax.plot(Xtrue[idx][0, t:t + 2], Xtrue[idx][1, t:t + 2], color=colors_leaf[int(Ztrue[idx][t])])
+    ax.set_title('true latent states')
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+
+# In[]
+    # Plot inferred latent states colored by inferred discrete state
+    ax = fig.add_subplot(gs[1, 0])
+    for idx in tqdm(range(len(Xtrue))):
+        for t in range(Xtrue[idx][0, :]):
+            ax.plot(Xinferr[idx][0, t:t + 2], Xinferr[idx][1, t:t + 2], color=colors_leaf[int(Zinferr[idx][t])])
+    ax.set_title('inferred latent states')
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+# In[]
+    #Plot true vector field and color by discrete state
+    ax = fig.add_subplot(gs[0, 1])
+    xmin = xlim[0]
+    xmax = xlim[1]
+    ymin = ylim[0]
+    ymax = ylim[1]
+    delta = 1
+    X, Y, arrows = plotting.vector_field(true_model.Aleaf, true_model.R, xmin, xmax, ymin, ymax, delta, true_model.depth,
+                                         true_model.leaf_paths, true_model.K)
+    norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
+    U = arrows[:, :, 0] / norm
+    V = arrows[:, :, 1] / norm
+    ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
+
+    X, Y, color = plotting.contour_plt(true_model.R, xmin, xmax, ymin, ymax, delta, true_model.depth,
+                                       true_model.leaf_paths, true_model.K)
+
+    for k in range(K):
+        start = np.array([1., 1., 1., 0.])
+        end = np.concatenate((colors_leaf[k], [0.5]))
+        cmap = plotting.gradient_cmap([start, end])
+        im1 = ax.imshow(color[:, :, k],
+                        extent=[xmin, xmax, ymin, ymax],
+                        vmin=0, vmax=1, cmap=cmap, origin='lower')
+        ax.set_aspect('auto')
+    ax.set_title('true vector field')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+
+# In[]
+    #Plot inferred vector field and color by discrete state
+    ax = fig.add_subplot(gs[1, 1])
+    X, Y, arrows = plotting.rot_vector_field(At[-1], trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth,
+                                             trslds.leaf_paths,
+                                             trslds.K, transform)
+    norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
+    U = arrows[:, :, 0] / norm
+    V = arrows[:, :, 1] / norm
+
+    ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
+
+    X, Y, color = plotting.rot_contour_plt(trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth, trslds.leaf_paths,
+                                           trslds.K, transform)
+
+    for k in range(K):
+        start = np.array([1., 1., 1., 0.])
+        end = np.concatenate((colors_leaf[k], [0.5]))
+        cmap = plotting.gradient_cmap([start, end])
+        im1 = ax.imshow(color[:, :, k],
+                        extent=[xmin, xmax, ymin, ymax],
+                        vmin=0, vmax=1, cmap=cmap, origin='lower')
+        ax.set_aspect('auto')
+    ax.set_title('inferred vector field')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+
+# In[]
+    #Plot vector field of root node
+    ax = fig.add_subplot(gs[0, 2])
+    root_depth = 1
+    root_K = 1
+    _, root_leaf_path, _, _ = utils.create_balanced_binary_tree(root_K)
+    X, Y, arrows = plotting.rot_vector_field(At[0], trslds.R, xmin, xmax, ymin, ymax, delta, root_depth,
+                                             root_leaf_path, root_K, transform)
+    norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
+    U = arrows[:, :, 0] / norm
+    V = arrows[:, :, 1] / norm
+
+    ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
+    ax.set_title('vector field of root node')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+
+
+# In[]
+    #Plot vector field of second layer
+    ax = fig.add_subplot(gs[1, 2])
+    second_depth = 2
+    second_K = 2
+    _, second_leaf_path, _, _ = utils.create_balanced_binary_tree(second_K)
+    X, Y, arrows = plotting.rot_vector_field(At[1], trslds.R, xmin, xmax, ymin, ymax, delta, second_depth,
+                                             second_leaf_path, second_K, transform)
+    norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
+    U = arrows[:, :, 0] / norm
+    V = arrows[:, :, 1] / norm
+
+    ax.streamplot(X, Y, U, V, color=np.log(norm), cmap='plasma_r')
+
+    X, Y, color = plotting.rot_contour_plt(trslds.R, xmin, xmax, ymin, ymax, delta, second_depth, second_leaf_path,
+                                           second_K, transform)
+
+    for k in range(second_K):
+        start = np.array([1., 1., 1., 0.])
+        end = np.concatenate((colors_leaf[k], [0.5]))
+        cmap = plotting.gradient_cmap([start, end])
+        im1 = ax.imshow(color[:, :, k],
+                        extent=[xmin, xmax, ymin, ymax],
+                        vmin=0, vmax=1, cmap=cmap, origin='lower')
+        ax.set_aspect('auto')
+    ax.set_title('vector field of second layer')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+
