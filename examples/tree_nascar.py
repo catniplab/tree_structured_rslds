@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
 
     #Perform Gibbs to train the model
-    no_samples = 10
+    no_samples = 100
     trslds = resample(no_samples, trslds)
 
    #Obtain transformation matrix from inferred latent space to true latent space
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     # Plot true latent states colored by true discrete state
     ax = fig.add_subplot(gs[0, 0])
     for idx in tqdm(range(len(Xtrue))):
-        for t in range(Xtrue[idx][0, :]):
+        for t in range(Xtrue[idx][0, :].size):
             ax.plot(Xtrue[idx][0, t:t + 2], Xtrue[idx][1, t:t + 2], color=colors_leaf[int(Ztrue[idx][t])])
     ax.set_title('true latent states')
     ax.set_xlabel('$x_1$')
@@ -158,7 +158,7 @@ if __name__ == "__main__":
     # Plot inferred latent states colored by inferred discrete state
     ax = fig.add_subplot(gs[1, 0])
     for idx in tqdm(range(len(Xtrue))):
-        for t in range(Xtrue[idx][0, :]):
+        for t in range(Xtrue[idx][0, :].size):
             ax.plot(Xinferr[idx][0, t:t + 2], Xinferr[idx][1, t:t + 2], color=colors_leaf[int(Zinferr[idx][t])])
     ax.set_title('inferred latent states')
     ax.set_xlabel('$x_1$')
@@ -277,4 +277,6 @@ if __name__ == "__main__":
     ax.set_ylim(ylim)
     ax.set_xlabel('$x_1$')
     ax.set_ylabel('$x_2$')
+    fig.tight_layout()
+    fig.show()
 
