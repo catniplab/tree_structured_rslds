@@ -30,4 +30,4 @@ github.com/pytorch/pytorch
 ````
 
 # Usage
-To get started, check out the [lorenz example](/examples/lorenz.py) which will fit a tree-structured recurrent switching linear dynamical system to a lorenz attractor, similar to Figure 3 of the ICLR paper.
+To get started, check out the [lorenz example](/examples/lorenz.py) which will fit a tree-structured recurrent switching linear dynamical system to a Lorenz attractor, similar to Figure 3 of the ICLR paper.
