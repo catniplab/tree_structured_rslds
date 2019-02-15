@@ -11,6 +11,7 @@ import scipy
 #3)Allow each discrete state to have a correspodning emission parameter
 #4)Add recurrent dependecies
 #5)Compute log unnormalized posterior
+#6) Rewrite kalman filter in square root form
 class TroSLDS:
     'The recurrent only TrSLDS. This was the model showcased in Nassar et al. ICLR (2019)'
     def __init__(self, D_in, D_out, K, dynamics, dynamics_noise, emission, hyper_planes, possible_paths, leaf_path,
