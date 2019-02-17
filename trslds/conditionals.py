@@ -187,7 +187,7 @@ def hyper_planes(w, x, z, prior_mu, prior_precision, draw_prior):
 
         return npr.multivariate_normal(posterior_mu.flatten(), posterior_cov)  # Return sample from posterior.
     else:
-        return npr.multivariate_normal(prior_mu, precision)  # If no data points then draw from prior.
+        return npr.multivariate_normal(prior_mu, prior_precision)  # If no data points then draw from prior.
 
 # In[6]:
 def _internal_dynamics(Mprior, Vparent, Achild, Vchild, N=2):
