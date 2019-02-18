@@ -391,3 +391,118 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
 
     return X
 
+
+# In[]:
+def sqrt_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
+              alphas, Lambdas, R, depth, omegay=None, bern=False):
+    '''
+    Polya-Gamma augmented kalman filter for sampling the continuous latent states
+    :param D_in: dimension of latent space
+    :param D_bias: dimension of input
+    :param X: list of continuous latnet states. Used to store sampled.
+    :param U: list of inputs
+    :param P: A 3D array used to store computed covariance matrices
+    :param As: Dynamics of leaf nodes
+    :param Qs: noise covariance matrices of leaf nodes
+    :param C: emission matrix (with affine term appended at the end)
+    :param S: emission noise covariance matrix
+    :param Y: list of observations of system
+    :param paths: paths taken
+    :param Z: list of discrete latent states
+    :param omega: list of polya-gamma rvs
+    :param alphas: used to store prior mean for each time step
+    :param Lambdas: used to store prior covaraince for each time step
+    :param R: hyperplanes
+    :param depth: maximum depth of tree
+    :return: sampled continuous latent states stored in X
+    '''
+    iden = np.eye(D_in)
+    "Filter forward"
+    for idx in range(len(X)):
+        for t in range(X[idx][0, :].size - 1):
+
+            if depth == 1:
+                alpha = X[idx][:, t] + 0  # If tree is of depth one then just run kalman filter
+                Lambda = P[:, :, t] + 0
+            else:
+                # Multiply product of PG augmented potentials and the last posterior
+                J = 0
+                temp_mu = 0
+                for d in range(depth - 1):
+                    loc = paths[idx][d, t]  # What node did you stop at
+                    fin = paths[idx][d + 1, t]  # Where did you go from current node
+                    if np.isnan(fin) != True:
+                        k = 0.5 * (fin % 2 == 1) - 0.5 * (
+                                fin % 2 == 0)  # Did you go left (ODD) or right (EVEN) from current node in tree
+                        tempR = np.expand_dims(R[d][:-1, int(loc - 1)], axis=1)
+                        J += omega[idx][d, t] * np.matmul(tempR, tempR.T)
+                        temp_mu += tempR.T * (k - omega[idx][d, t] * R[d][-1, int(loc - 1)])
+
+                Pinv = np.linalg.inv(P[:, :, t])
+                Lambda = np.linalg.inv(Pinv + J)
+                alpha = Lambda @ (Pinv @ X[idx][:, t][:, na] + temp_mu.T)
+
+            # Store alpha and Lambda for later use
+            alphas[:, t] = alpha.flatten() + 0
+            Lambdas[:, :, t] = Lambda + 0
+            # Prediction
+            Q = Qs[:, :, int(Z[idx][t])] + 0
+            x_prior = (As[:, :-D_bias, int(Z[idx][t])] @ alpha + \
+                       As[:, -D_bias:, int(Z[idx][t])] @ U[idx][:, t][:, na]).flatten()
+
+            P_prior = np.matmul(np.matmul(As[:, :-D_bias, int(Z[idx][t])], Lambda),
+                                As[:, :-D_bias, int(Z[idx][t])].T) + Q
+            if bern:  # If observations are bernoulli
+                kt = Y[idx][:, t] - 0.5
+                S = np.diag(1 / omegay[idx][:, t])
+
+            # Compute Kalman gain
+            K = np.matmul(P_prior, np.linalg.solve(np.matmul(np.matmul(C[:, :-1], P_prior),
+                                                             C[:, :-1].T) + S, C[:, :-1]).T)
+
+            # Correction of estimate
+            if bern:
+                X[idx][:, t + 1] = x_prior + np.matmul(K,
+                                                       kt / omegay[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:,
+                                                                                                                -1])
+
+            else:
+                X[idx][:, t + 1] = x_prior + np.matmul(K, (Y[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1]))
+            P_temp = np.matmul((iden - np.matmul(K, C[:, :-1])), P_prior)
+
+            P[:, :, t + 1] = np.array((P_temp + P_temp.T) / 2) + 1e-8 * iden  # Numerical stability
+
+        """
+        Sample backwards
+        """
+        # X[idx][:, -1] = np.random.multivariate_normal(np.array(X[idx][:, -1]).ravel(), P[:, :, X[idx][0, :].size - 1])
+        X[idx][:, -1] = X[idx][:, -1] + (
+                np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
+
+        for t in range(X[idx][0, :].size - 2, -1, -1):
+            # Load in alpha and lambda
+            alpha = alphas[:, t]
+            Lambda = Lambdas[:, :, t]
+
+            A_tot = As[:, :-D_bias, int(Z[idx][t])]
+            B_tot = As[:, -D_bias:, int(Z[idx][t])][:, na]
+            Q = Qs[:, :, int(Z[idx][t])]
+
+            Pn = Lambda - np.matmul(Lambda, np.matmul(A_tot.T,
+                                                      np.linalg.solve(Q + np.matmul(np.matmul(A_tot, Lambda), A_tot.T),
+                                                                      np.matmul(A_tot, Lambda))))
+            mu_n = np.matmul(Pn, np.linalg.solve(Lambda, alpha)[:, na] + np.matmul(A_tot.T,
+                                                                                   np.linalg.solve(Q,
+                                                                                                   X[idx][:, t + 1][:,
+                                                                                                   na] - np.matmul(
+                                                                                                       B_tot,
+                                                                                                       U[idx][:, t]))))
+
+            # To ensure PSD of matrix
+            Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
+
+            # Sample
+            X[idx][:, t] = (mu_n + np.linalg.cholesky(Pn) @ npr.normal(size=D_in)[:, na]).ravel()
+
+    return X
+
