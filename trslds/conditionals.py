@@ -393,7 +393,7 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
 
 
 # In[]:
-def sqrt_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
+def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
               alphas, Lambdas, R, depth, omegay=None, bern=False):
     '''
     Polya-Gamma augmented kalman filter for sampling the continuous latent states
@@ -438,7 +438,9 @@ def sqrt_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                         J += omega[idx][d, t] * np.matmul(tempR, tempR.T)
                         temp_mu += tempR.T * (k - omega[idx][d, t] * R[d][-1, int(loc - 1)])
 
-                Pinv = np.linalg.inv(P[:, :, t])
+                "Take cholesky decomposition and then invert that"
+                Pinv = np.linalg.inv(np.linalg.cholesky(P[:, :, t]))
+                Pinv = Pinv.T @ Pinv
                 Lambda = np.linalg.inv(Pinv + J)
                 alpha = Lambda @ (Pinv @ X[idx][:, t][:, na] + temp_mu.T)
 
@@ -457,8 +459,8 @@ def sqrt_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                 S = np.diag(1 / omegay[idx][:, t])
 
             # Compute Kalman gain
-            K = np.matmul(P_prior, np.linalg.solve(np.matmul(np.matmul(C[:, :-1], P_prior),
-                                                             C[:, :-1].T) + S, C[:, :-1]).T)
+            K = P_prior @ (scipy.linalg.cho_solve(np.linalg.cholesky(C[:, :-1] @ P_prior @ C[:, :-1].T + S),
+                                                  C[:, :-1], check_finite=False)).T
 
             # Correction of estimate
             if bern:
@@ -475,7 +477,6 @@ def sqrt_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
         """
         Sample backwards
         """
-        # X[idx][:, -1] = np.random.multivariate_normal(np.array(X[idx][:, -1]).ravel(), P[:, :, X[idx][0, :].size - 1])
         X[idx][:, -1] = X[idx][:, -1] + (
                 np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
 
@@ -488,15 +489,12 @@ def sqrt_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             B_tot = As[:, -D_bias:, int(Z[idx][t])][:, na]
             Q = Qs[:, :, int(Z[idx][t])]
 
-            Pn = Lambda - np.matmul(Lambda, np.matmul(A_tot.T,
-                                                      np.linalg.solve(Q + np.matmul(np.matmul(A_tot, Lambda), A_tot.T),
-                                                                      np.matmul(A_tot, Lambda))))
-            mu_n = np.matmul(Pn, np.linalg.solve(Lambda, alpha)[:, na] + np.matmul(A_tot.T,
-                                                                                   np.linalg.solve(Q,
-                                                                                                   X[idx][:, t + 1][:,
-                                                                                                   na] - np.matmul(
-                                                                                                       B_tot,
-                                                                                                       U[idx][:, t]))))
+            Pn = Lambda - Lambda @ A_tot.T @ scipy.linalg.cho_solve(np.linalg.cholesky(Q + A_tot @ Lambda @ A_tot.T),
+                                                                     A_tot, check_finite=False) @ Lambda
+
+            mu_n = Pn @ (scipy.linalg.cho_solve(np.linalg.cholesky(Lambda), alpha, check_finite=False) + A_tot.T
+                         + scipy.linalg.cho_solve(np.linalg.cholesky(Q),
+                                                  X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t], check_finite=False))
 
             # To ensure PSD of matrix
             Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
