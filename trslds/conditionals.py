@@ -417,6 +417,13 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     :return: sampled continuous latent states stored in X
     '''
     iden = np.eye(D_in)
+
+    # Pre-compute the inverse of the noise covariance for sampling backwards
+    Qinvs = np.zeros((D_in, D_in, Qs[0, 0, :].size))
+    for k in range(Qs[0, 0, :].size):
+        temp = np.linalg.inv(np.linalg.cholesky(Qs[:, :, k]))
+        Qinvs[:, :, k] = temp.T @ temp
+
     "Filter forward"
     for idx in range(len(X)):
         for t in range(X[idx][0, :].size - 1):
@@ -441,7 +448,8 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                 "Take cholesky decomposition and then invert that"
                 Pinv = np.linalg.inv(np.linalg.cholesky(P[:, :, t]))
                 Pinv = Pinv.T @ Pinv
-                Lambda = np.linalg.inv(Pinv + J)
+                Lambda = np.linalg.inv(np.linalg.cholesky(Pinv + J))
+                Lambda = Lambda.T @ Lambda
                 alpha = Lambda @ (Pinv @ X[idx][:, t][:, na] + temp_mu.T)
 
             # Store alpha and Lambda for later use
@@ -487,14 +495,13 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
 
             A_tot = As[:, :-D_bias, int(Z[idx][t])]
             B_tot = As[:, -D_bias:, int(Z[idx][t])][:, na]
-            Q = Qs[:, :, int(Z[idx][t])]
+            Qinv = Qinvs[:, :, int(Z[idx][t])]
 
             Pn = Lambda - Lambda @ A_tot.T @ scipy.linalg.cho_solve(np.linalg.cholesky(Q + A_tot @ Lambda @ A_tot.T),
                                                                      A_tot, check_finite=False) @ Lambda
 
-            mu_n = Pn @ (scipy.linalg.cho_solve(np.linalg.cholesky(Lambda), alpha, check_finite=False) + A_tot.T
-                         + scipy.linalg.cho_solve(np.linalg.cholesky(Q),
-                                                  X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t], check_finite=False))
+            mu_n = Pn @ (scipy.linalg.cho_solve(np.linalg.cholesky(Lambda), alpha, check_finite=False) + A_tot.T @
+                         Qinv @ (X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t][:, na]))
 
             # To ensure PSD of matrix
             Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
