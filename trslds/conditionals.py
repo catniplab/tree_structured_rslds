@@ -467,7 +467,7 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                 S = np.diag(1 / omegay[idx][:, t])
 
             # Compute Kalman gain
-            K = P_prior @ (scipy.linalg.cho_solve(np.linalg.cholesky(C[:, :-1] @ P_prior @ C[:, :-1].T + S),
+            K = P_prior @ (scipy.linalg.cho_solve((np.linalg.cholesky(C[:, :-1] @ P_prior @ C[:, :-1].T + S), True),
                                                   C[:, :-1], check_finite=False)).T
 
             # Correction of estimate
@@ -494,13 +494,13 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             Lambda = Lambdas[:, :, t]
 
             A_tot = As[:, :-D_bias, int(Z[idx][t])]
-            B_tot = As[:, -D_bias:, int(Z[idx][t])][:, na]
+            B_tot = As[:, -D_bias:, int(Z[idx][t])]
             Qinv = Qinvs[:, :, int(Z[idx][t])]
 
-            Pn = Lambda - Lambda @ A_tot.T @ scipy.linalg.cho_solve(np.linalg.cholesky(Q + A_tot @ Lambda @ A_tot.T),
+            Pn = Lambda - Lambda @ A_tot.T @ scipy.linalg.cho_solve((np.linalg.cholesky(Q + A_tot @ Lambda @ A_tot.T), True),
                                                                      A_tot, check_finite=False) @ Lambda
 
-            mu_n = Pn @ (scipy.linalg.cho_solve(np.linalg.cholesky(Lambda), alpha, check_finite=False) + A_tot.T @
+            mu_n = Pn @ (scipy.linalg.cho_solve((np.linalg.cholesky(Lambda), True), alpha, check_finite=False)[:, na] + A_tot.T @
                          Qinv @ (X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t][:, na]))
 
             # To ensure PSD of matrix

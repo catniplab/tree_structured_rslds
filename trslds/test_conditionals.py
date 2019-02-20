@@ -202,97 +202,97 @@ for d in range( depth-2, depth ): #Check the last two levels
 #Sest = np.mean(S_samples, axis=2)
 
 # In[5]:
-"Leaf dynamics"
-Aplace = []
-for level in range(depth):
-    Aplace.append(np.zeros((dim, dim + 1, 2**level)))
-Qplace = np.zeros((dim, dim, K))
-no_samples = 1000
-Asamples = np.zeros((dim , dim + 1, K, no_samples))
-Qsamples = np.zeros((dim, dim, K, no_samples))
-scale = 0.9
-U = [np.ones((1, X[idx][0, :].size)) for idx in range(len(X))]
-
-leaf_nodes = [] #A list of tuples (d,n,k) where d and n are the depth and node in the tree respectively
-leaf_path = possible_paths
-for d in range( depth-2, depth ): #Check the last two levels
-    for k in range(K):
-        if d == depth -1: #bottom level of tree
-            if not np.isnan(leaf_path[d, k]):
-                leaf_nodes.append( (int(d), int(leaf_path[d,k]-1), int(k) ) )
-        else: #level before bottom level
-            if np.isnan(leaf_path[d+1,k]):
-                leaf_nodes.append( ( int(d), int(leaf_path[d, k]-1), int(k) ) )
-
-for m in tqdm(range(no_samples)):
-    Aplace, Qsamples[:, :, :, m] = utils.sample_leaf_dynamics(X, U, Z, Aplace, 
-                    Qplace, nux, lambdax, Mx, Vx, scale, leaf_nodes)
-    Aplace = utils.sample_internal_dynamics(Aplace, scale, Mx, Vx, depth)
-    Asamples[:, :, :, m] = Aplace[-1]
-Aest = np.mean(Asamples, axis=3)
-Qest = np.mean(Qsamples, axis=3)
-print('\n')
-[print(Qest[:, :, k]) for k in range(K)]
-
-for k in range(K):
-    print(Aest[:, :, k])
-    print(A[:, :, k])
-
-# In[6]:
-"Test hyperplanes"
-no_samples = 300
-Rroot = np.zeros((dim + 1, 1, no_samples))
-Rsecond = np.zeros((dim + 1, 2, no_samples))
-
-Rroot = np.ones((dim + 1, 1, no_samples))
-Rsecond = np.ones((dim + 1, 2, no_samples))
-
-R_place = []
-for level in range(depth - 1):
-    R_place.append(0*(2*npr.rand(dim + 1, 2**level) - 1))
-#R_place = copy.deepcopy(R)
-omega = [ np.zeros((depth - 1, X[idx][0, :].size)) for idx in range(len(X)) ]
-for m in tqdm(range(no_samples)):
-    omega = samp.pg_tree_posterior(X, omega, R_place, paths, depth)
-#    R_place = utils.sample_hyperplanes(X, omega, paths, depth, mu, Sigma, 
+#"Leaf dynamics"
+#Aplace = []
+#for level in range(depth):
+#    Aplace.append(np.zeros((dim, dim + 1, 2**level)))
+#Qplace = np.zeros((dim, dim, K))
+#no_samples = 1000
+#Asamples = np.zeros((dim , dim + 1, K, no_samples))
+#Qsamples = np.zeros((dim, dim, K, no_samples))
+#scale = 0.9
+#U = [np.ones((1, X[idx][0, :].size)) for idx in range(len(X))]
+#
+#leaf_nodes = [] #A list of tuples (d,n,k) where d and n are the depth and node in the tree respectively
+#leaf_path = possible_paths
+#for d in range( depth-2, depth ): #Check the last two levels
+#    for k in range(K):
+#        if d == depth -1: #bottom level of tree
+#            if not np.isnan(leaf_path[d, k]):
+#                leaf_nodes.append( (int(d), int(leaf_path[d,k]-1), int(k) ) )
+#        else: #level before bottom level
+#            if np.isnan(leaf_path[d+1,k]):
+#                leaf_nodes.append( ( int(d), int(leaf_path[d, k]-1), int(k) ) )
+#
+#for m in tqdm(range(no_samples)):
+#    Aplace, Qsamples[:, :, :, m] = utils.sample_leaf_dynamics(X, U, Z, Aplace, 
+#                    Qplace, nux, lambdax, Mx, Vx, scale, leaf_nodes)
+#    Aplace = utils.sample_internal_dynamics(Aplace, scale, Mx, Vx, depth)
+#    Asamples[:, :, :, m] = Aplace[-1]
+#Aest = np.mean(Asamples, axis=3)
+#Qest = np.mean(Qsamples, axis=3)
+#print('\n')
+#[print(Qest[:, :, k]) for k in range(K)]
+#
+#for k in range(K):
+#    print(Aest[:, :, k])
+#    print(A[:, :, k])
+#
+## In[6]:
+#"Test hyperplanes"
+#no_samples = 300
+#Rroot = np.zeros((dim + 1, 1, no_samples))
+#Rsecond = np.zeros((dim + 1, 2, no_samples))
+#
+#Rroot = np.ones((dim + 1, 1, no_samples))
+#Rsecond = np.ones((dim + 1, 2, no_samples))
+#
+#R_place = []
+#for level in range(depth - 1):
+#    R_place.append(0*(2*npr.rand(dim + 1, 2**level) - 1))
+##R_place = copy.deepcopy(R)
+#omega = [ np.zeros((depth - 1, X[idx][0, :].size)) for idx in range(len(X)) ]
+#for m in tqdm(range(no_samples)):
+#    omega = samp.pg_tree_posterior(X, omega, R_place, paths, depth)
+##    R_place = utils.sample_hyperplanes(X, omega, paths, depth, mu, Sigma, 
+##                                       possible_paths, R_place)
+#    R_place = utils.sample_hyperplanes(X, omega, paths, depth, mu, tau, 
 #                                       possible_paths, R_place)
-    R_place = utils.sample_hyperplanes(X, omega, paths, depth, mu, tau, 
-                                       possible_paths, R_place)
-    Rroot[:, :, m] = R_place[0]
-    Rsecond[:, :, m] = R_place[1]
-R1est = np.mean(Rroot[:, :, int(no_samples/2):], axis=2)
-R2est = np.mean(Rsecond[:, :, int(no_samples/2):], axis=2)
-
-# In[7]:
-"Test discrete latent states"
-no_samples = 100
-Z_samples = []
-Ztemp = copy.deepcopy(Z)
-path_temp = copy.deepcopy(paths)
-U = [np.ones((1, X[idx][0, :].size)) for idx in range(len(X))]
-
-for m in tqdm(range(no_samples)):
-    Ztemp, path_temp = samp.discrete_latent_recurrent_only(Ztemp, path_temp, leaf_path, 
-                                           K, X, U, A, np.repeat(Q[:, :, na], K, axis=2),
-                                           R, depth, 1)
-    Z_samples.append(Ztemp)
-
-
-# In[8]:
-zest = []
-for idx in tqdm(range(no_realizations)):
-    ztemp = np.zeros((no_samples, Z[idx].size))
-    for m in range(no_samples):
-        ztemp[m, :] = Z_samples[m][idx]
-    zest.append(mode(ztemp, axis = 0)[0])
-
-correct = 0
-total = 0
-for idx in range(no_realizations):
-    correct += np.sum(zest[idx] == Z[idx])
-    total += zest[idx].size
-
-print(correct/total)
+#    Rroot[:, :, m] = R_place[0]
+#    Rsecond[:, :, m] = R_place[1]
+#R1est = np.mean(Rroot[:, :, int(no_samples/2):], axis=2)
+#R2est = np.mean(Rsecond[:, :, int(no_samples/2):], axis=2)
+#
+## In[7]:
+#"Test discrete latent states"
+#no_samples = 100
+#Z_samples = []
+#Ztemp = copy.deepcopy(Z)
+#path_temp = copy.deepcopy(paths)
+#U = [np.ones((1, X[idx][0, :].size)) for idx in range(len(X))]
+#
+#for m in tqdm(range(no_samples)):
+#    Ztemp, path_temp = samp.discrete_latent_recurrent_only(Ztemp, path_temp, leaf_path, 
+#                                           K, X, U, A, np.repeat(Q[:, :, na], K, axis=2),
+#                                           R, depth, 1)
+#    Z_samples.append(Ztemp)
+#
+#
+## In[8]:
+#zest = []
+#for idx in tqdm(range(no_realizations)):
+#    ztemp = np.zeros((no_samples, Z[idx].size))
+#    for m in range(no_samples):
+#        ztemp[m, :] = Z_samples[m][idx]
+#    zest.append(mode(ztemp, axis = 0)[0])
+#
+#correct = 0
+#total = 0
+#for idx in range(no_realizations):
+#    correct += np.sum(zest[idx] == Z[idx])
+#    total += zest[idx].size
+#
+#print(correct/total)
 
 # In[8]:
 "Test continuous latent states"
@@ -308,7 +308,7 @@ omega = [ np.zeros((depth - 1, X[idx][0, :].size)) for idx in range(len(X)) ]
 Lambdas = np.repeat(20*np.eye(dim)[:, :, na], max_len, axis=2)
 for m in tqdm(range(no_samples)):
     omega = samp.pg_tree_posterior(Xtemp, omega, R, paths, depth)
-    Xtemp = samp.pg_kalman(dim, 1, Xtemp, U, P, A, np.repeat(Q[:, :, na], K, axis=2), 
+    Xtemp = samp.chol_pg_kalman(dim, 1, Xtemp, U, P, A, np.repeat(Q[:, :, na], K, axis=2),
                            Ct, S, Y, paths, Z, omega, alphas, Lambdas, R, depth)
     X_samples.append(Xtemp)
 # In[9]:
