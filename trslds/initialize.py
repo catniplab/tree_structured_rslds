@@ -2,7 +2,7 @@ import numpy as np
 from scipy import linalg
 from trslds import fit_greedy_mse as fit
 from sklearn.decomposition import PCA
-from trslds import utils
+from . import utils
 from numpy import newaxis as na
 import numpy.random as npr
 

@@ -1,8 +1,7 @@
 import numpy as np
 import numpy.random as npr
-from numba import jit
-from trslds import conditionals
-from trslds import utils
+from . import conditionals
+from . import utils
 from numpy import newaxis as na
 import scipy
 #To Do List:

@@ -2,7 +2,7 @@ import numpy as np
 import numpy.random as npr
 from numpy import newaxis as na
 from scipy.stats import invwishart
-from trslds import conditionals
+from . import conditionals
 import torch
 from torch.autograd import Variable
 import torch.optim as optim

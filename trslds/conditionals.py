@@ -1,5 +1,5 @@
 import numpy as np
-import trslds.utils as utils
+from . import utils
 from numpy import newaxis as na
 import numpy.random as npr
 import scipy
