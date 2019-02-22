@@ -9,9 +9,10 @@ from pypolyagamma import PyPolyaGamma
 import pypolyagamma
 from numba import jit
 import pdb
+from os import cpu_count
 
 # In[1]:
-def pg_tree_posterior(states, omega, R, path, depth):
+def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
     '''
     Sample Polya-Gamma w_n,t|x_t,z_{t+1} where the subscript n denotes the hyperplane
     for which we are augmenting with the Polya-Gamma. Thus will augment all the logistic regressions
@@ -26,7 +27,8 @@ def pg_tree_posterior(states, omega, R, path, depth):
     for idx in range(len(states)):
         T = states[idx][0, :].size
         b = np.ones(T * (depth - 1))
-        nthreads = 8
+        if nthreads is None:
+            nthreads = cpu_count()
         v = np.ones((depth - 1, T))
         out = np.empty(T * (depth - 1))
         #Compute parameters for conditional
@@ -44,7 +46,7 @@ def pg_tree_posterior(states, omega, R, path, depth):
 
 
 # In[2]:
-def pg_spike_train(X, C, Omega, D_out):
+def pg_spike_train(X, C, Omega, D_out, nthreads=None):
     '''
     Sample Polya-Gamma wy|Y,C,D,X where Y are spike trains and X are the continuous latent states
     :param X: continuous latent states
@@ -56,7 +58,8 @@ def pg_spike_train(X, C, Omega, D_out):
     for idx in range(len(X)):
         T = X[idx][0, 1:].size
         b = np.ones(T * D_out)
-        nthreads = T * D_out
+        if nthreads is None:
+            nthreads = cpu_count()
         out = np.empty(T * D_out)
         V = C[:, :-1] @ X[idx][:, 1:] + C[:, -1][:, na]  # Ignore the initial point of the time series
 
@@ -305,6 +308,9 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     :return: sampled continuous latent states stored in X
     '''
     iden = np.eye(D_in)
+    
+    
+    
     "Filter forward"
     for idx in range(len(X)):
         for t in range(X[idx][0, :].size - 1):
@@ -446,10 +452,8 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                         temp_mu += tempR.T * (k - omega[idx][d, t] * R[d][-1, int(loc - 1)])
 
                 "Take cholesky decomposition and then invert that"
-                Pinv = np.linalg.inv(np.linalg.cholesky(P[:, :, t]))
-                Pinv = Pinv.T @ Pinv
-                Lambda = np.linalg.inv(np.linalg.cholesky(Pinv + J))
-                Lambda = Lambda.T @ Lambda
+                Pinv = np.linalg.inv(P[:, :, t])
+                Lambda = np.linalg.inv(Pinv + J)
                 alpha = Lambda @ (Pinv @ X[idx][:, t][:, na] + temp_mu.T)
 
             # Store alpha and Lambda for later use
@@ -467,8 +471,8 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                 S = np.diag(1 / omegay[idx][:, t])
 
             # Compute Kalman gain
-            K = P_prior @ (scipy.linalg.cho_solve((np.linalg.cholesky(C[:, :-1] @ P_prior @ C[:, :-1].T + S), True),
-                                                  C[:, :-1], check_finite=False)).T
+            K = np.matmul(P_prior, np.linalg.solve(np.matmul(np.matmul(C[:, :-1], P_prior),
+                                                             C[:, :-1].T) + S, C[:, :-1]).T)
 
             # Correction of estimate
             if bern:
@@ -497,10 +501,8 @@ def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             B_tot = As[:, -D_bias:, int(Z[idx][t])]
             Qinv = Qinvs[:, :, int(Z[idx][t])]
 
-            Pn = Lambda - Lambda @ A_tot.T @ scipy.linalg.cho_solve((np.linalg.cholesky(Q + A_tot @ Lambda @ A_tot.T), True),
-                                                                     A_tot, check_finite=False) @ Lambda
-
-            mu_n = Pn @ (scipy.linalg.cho_solve((np.linalg.cholesky(Lambda), True), alpha, check_finite=False)[:, na] + A_tot.T @
+            Pn = Lambda - Lambda @ A_tot.T @ np.linalg.solve(Q + A_tot @ Lambda @ A_tot.T, A_tot) @ Lambda
+            mu_n = Pn @ (np.linalg.solve(Lambda, alpha)[:, na] + A_tot.T @
                          Qinv @ (X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t][:, na]))
 
             # To ensure PSD of matrix
