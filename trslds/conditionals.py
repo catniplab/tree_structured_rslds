@@ -197,16 +197,17 @@ def hyper_planes(w, x, z, prior_mu, prior_precision, draw_prior):
 
         return npr.multivariate_normal(posterior_mu.flatten(), posterior_cov)  # Return sample from posterior.
 
+
 # In[6]:
 def _internal_dynamics(Mprior, Vparent, Achild, Vchild, N=2):
-    '''
+    """
     Sample from dynamics conditional of an internal node in tree
     :param Mprior: prior of dynamics
     :param Vparent: prior column covariance
     :param Achild: sum of realization of dynamics of children
     :param Vchild: children column covariance
-    :return:
-    '''
+    :return: Sample from posterior
+    """
     assert Mprior.shape == Achild.shape
     precision_parent = np.linalg.inv(np.kron(Vparent, np.eye(Achild[:, 0].size)))
     precision_child = np.linalg.inv(np.kron(Vchild, np.eye(Achild[:, 0].size)))
@@ -215,7 +216,6 @@ def _internal_dynamics(Mprior, Vparent, Achild, Vchild, N=2):
     posterior_mu = posterior_sigma @ (precision_parent @ Mprior.flatten(order='F')[:, na] + 
                                       precision_child @ Achild.flatten(order='F')[:, na])
     return npr.multivariate_normal(posterior_mu.flatten(), posterior_sigma).reshape(Achild.shape, order='F')
-
 
 
 # In[7]:
