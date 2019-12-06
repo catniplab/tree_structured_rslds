@@ -11,19 +11,21 @@ from numba import jit
 import pdb
 from os import cpu_count
 
+
 # In[1]:
 def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
-    '''
+    """
     Sample Polya-Gamma w_n,t|x_t,z_{t+1} where the subscript n denotes the hyperplane
     for which we are augmenting with the Polya-Gamma. Thus will augment all the logistic regressions
     that was taken while traversing down the tree
-    :param states: This variable contains the continuous latent states. It is a list of numpy arrays
-    :param omega: list for storing polya-gamma variables
-    :param R: normal vectors of hyper-plane where the bias term is the last element in that array. The format is a list of arrays.
+    :param states: List of numpy arrays where each element is a trajectory.
+    :param omega: List for storing polya-gamma variables.
+    :param R: Normal vectors for hyper-planes where the bias term ins the last element in that array.
     :param path: path taken through the tree at time t. a list of numpy arrays
     :param depth: maximum depth of the tree
-    :return: a list of pg rvs for each time series
-    '''
+    :param nthreads: Number of threads for parallel sampling.
+    :return: list of pg rvs for each time series.
+    """
     for idx in range(len(states)):
         T = states[idx][0, :].size
         b = np.ones(T * (depth - 1))
@@ -31,14 +33,14 @@ def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
             nthreads = cpu_count()
         v = np.ones((depth - 1, T))
         out = np.empty(T * (depth - 1))
-        #Compute parameters for conditional
+        # Compute parameters for conditional
         for d in range(depth - 1):
             for t in range(T):
                 index = int(path[idx][d, t] - 1)  # Find which node you went through
                 v[d, t] = np.matmul(R[d][:-1, index], np.array(states[idx][:, t])) + R[d][-1, index]
         seeds = np.random.randint(2 ** 16, size=nthreads)
         ppgs = [PyPolyaGamma(seed) for seed in seeds]
-        #Sample in parallel
+        # Sample in parallel
         pypolyagamma.pgdrawvpar(ppgs, b, v.flatten(order='F'), out)
         omega[idx] = out.reshape((depth - 1, T), order='F')
 
