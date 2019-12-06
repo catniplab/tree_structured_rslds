@@ -78,7 +78,7 @@ def pg_spike_train(X, C, Omega, D_out, nthreads=None, N=1):
 
 # In[3]:
 def emission_parameters(obsv, states, mask, nu, Lambda, M, V, normalize=True):
-    '''
+    """
     Sampling from MNIW conditional distribution for emission parameters
     :param obsv: list of observations
     :param states: list of continuous latentstates
@@ -88,8 +88,8 @@ def emission_parameters(obsv, states, mask, nu, Lambda, M, V, normalize=True):
     :param M: prior mean of emission
     :param V: prior row covariance
     :param normalize: boolean variable that dictates whether to normalize the columns of C
-    :return:  Sample from MNIW posterior, (C, S), where C is normalized to unit column norms for psuedo manifold sampling
-    '''
+    :return:  Sample from MNIW posterior, (C, S), where C is normalized to unit column norms for pseudo-manifold sampling
+    """
 
     Y = np.hstack(obsv).T  # stack observations
     X = np.hstack([states[idx][:, 1:] for idx in range(len(states))])  # Stack observations disregarding the first point
@@ -104,9 +104,9 @@ def emission_parameters(obsv, states, mask, nu, Lambda, M, V, normalize=True):
 
     C, S = utils.sample_mniw(df_posterior, IW_matrix, M_posterior, V_posterior)
 
-    if normalize: #If true then normalize columns of C (except the last column which is the affine term)
+    if normalize:  # If true then normalize columns of C (except the last column which is the affine term)
         C_temp = C[:, :-1]
-        #Normalize columns
+        # Normalize columns
         L = np.diag(C_temp.T @ C_temp)
         L = np.diag(np.power(L, -0.5))
         C_temp = C_temp @ L
