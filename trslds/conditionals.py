@@ -220,7 +220,7 @@ def _internal_dynamics(Mprior, Vparent, Achild, Vchild, N=2):
 
 # In[7]:
 def leaf_dynamics(Y, X, nu, Lambda, M, V, draw_prior):
-    '''
+    """
     Obtain sample of leaf dynamics and noise covariance of MNIW conditional posterior
     :param Y: x_{1:T} in list format
     :param X: x_{0:T-1} in list format
@@ -230,13 +230,13 @@ def leaf_dynamics(Y, X, nu, Lambda, M, V, draw_prior):
     :param V: prior column covariance
     :param draw_prior: boolean variable indicating whether we should sample directly from the prior
     :return: sample A, Q
-    '''
-    if not draw_prior:
-        M_posterior, V_posterior, IW_matrix, df_posterior = utils.compute_ss_mniw(X.T, Y.T, nu, Lambda, M, V)
-        A, Q = utils.sample_mniw(df_posterior, IW_matrix, M_posterior, V_posterior)
+    """
+    if draw_prior:
+        A, Q = utils.sample_mniw(nu, Lambda, M, V)
         return A, Q
     else:
-        A, Q = utils.sample_mniw(nu, Lambda, M, V)
+        M_posterior, V_posterior, IW_matrix, df_posterior = utils.compute_ss_mniw(X.T, Y.T, nu, Lambda, M, V)
+        A, Q = utils.sample_mniw(df_posterior, IW_matrix, M_posterior, V_posterior)
         return A, Q
 
 
