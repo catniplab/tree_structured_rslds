@@ -48,22 +48,24 @@ def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
 
 
 # In[2]:
-def pg_spike_train(X, C, Omega, D_out, nthreads=None):
-    '''
+def pg_spike_train(X, C, Omega, D_out, nthreads=None, N=1):
+    """
     Sample Polya-Gamma wy|Y,C,D,X where Y are spike trains and X are the continuous latent states
-    :param X: continuous latent states
+    :param X: List of continuous latent states
     :param C: emission parameters. bias parameter is appended to last column.
     :param Omega: list used for storing polya-gamma variables
     :param D_out: Dimension of output i..e number of neurons
-    :return: polya gamma samples from conditional posterior in a list of numpy arrays
-    '''
+    :param nthreads: Number of threads for parallel sampling.
+    :param N: Maximum number of spikes i.e. N from a binomial distribution
+    :return:
+    """
     for idx in range(len(X)):
         T = X[idx][0, 1:].size
-        b = np.ones(T * D_out)
+        b = N * np.ones(T * D_out)
         if nthreads is None:
             nthreads = cpu_count()
         out = np.empty(T * D_out)
-        V = C[:, :-1] @ X[idx][:, 1:] + C[:, -1][:, na]  # Ignore the initial point of the time series
+        V = C[:, :-1] @ X[idx][:, 1:] + C[:, -1][:, na]  # Ignore the first point of the time series
 
         seeds = np.random.randint(2 ** 16, size=nthreads)
         ppgs = [PyPolyaGamma(seed) for seed in seeds]
