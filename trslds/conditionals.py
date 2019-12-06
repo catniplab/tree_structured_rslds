@@ -170,31 +170,32 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
 # In[5]:
 #@jit(nopython=True)
 def hyper_planes(w, x, z, prior_mu, prior_precision, draw_prior):
-    '''
+    """
     Sample from the conditional posterior of the hyperplane. Due to the polya-gamma augmentation, the model is normal.
     :param w: list of polya gamma rvs
     :param x: list of continuous latent states
     :param z: list of tree indices
     :param prior_mu: prior mean
-    :param prior_sigma: prior covariance
+    :param prior_precision: prior covariance
     :param draw_prior: boolean variable indicating whether to sample from the prior or not
     :return: sample from conditional posterior
-    '''
-    if draw_prior == False:
-        J = prior_precision @ prior_mu[:, na] # J = Sigma^{-1}*mu
+    """
+
+    if draw_prior:
+        return npr.multivariate_normal(prior_mu, prior_precision)  # If no data points then draw from prior.
+    else:
+        J = prior_precision @ prior_mu[:, na]  # J = Sigma^{-1}*mu
         xw_tilde = np.multiply(x, np.sqrt(w[na, :]))  # pre multiply by sqrt(w_n,t )
         precision = np.einsum('ij,ik->jk', xw_tilde.T,
-                                 xw_tilde.T)  # Use einstein summation to compute sum of outer products
+                              xw_tilde.T)  # Use einstein summation to compute sum of outer products
 
-        k = z % 2 - 0.5 #Check to see if you went left or right from current node
+        k = z % 2 - 0.5  # Check to see if you went left or right from current node
         J += np.sum(x * k[na, :], axis=1)[:, na]
-        
-        posterior_cov = np.linalg.inv(precision + prior_precision) #Obtain posterior covariance
+
+        posterior_cov = np.linalg.inv(precision + prior_precision)  # Obtain posterior covariance
         posterior_mu = posterior_cov @ J
 
         return npr.multivariate_normal(posterior_mu.flatten(), posterior_cov)  # Return sample from posterior.
-    else:
-        return npr.multivariate_normal(prior_mu, prior_precision)  # If no data points then draw from prior.
 
 # In[6]:
 def _internal_dynamics(Mprior, Vparent, Achild, Vchild, N=2):
