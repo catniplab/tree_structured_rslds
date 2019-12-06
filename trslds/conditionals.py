@@ -117,7 +117,7 @@ def emission_parameters(obsv, states, mask, nu, Lambda, M, V, normalize=True):
 
 # In[4]:
 def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, normalize=True):
-    '''
+    """
     Sample from conditional posterior of emission parameters where emission model is a bernoulli glm.
     :param spikes: list of spike trains
     :param states: list of continuous latent states
@@ -127,14 +127,14 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
     :param Sigma: prior covariance
     :param normalize: boolean variable that dictates whether to normalize the columns of C
     :return: sample from conditional posterior, C where columns are normalized.
-    '''
-    X = np.hstack([states[idx][:, 1:] for idx in range(len(states))]) #stack all continuous latent states (ignore initial starting point)
-    X = np.vstack((X, np.ones(X[0, :].size)))  #append a vecor of ones for affine term
-    Y = np.hstack(spikes) #stack all spike trains
-    W = np.hstack(Omega) #stack all spike polya-gamma rvs
-    boolean_mask = np.hstack(mask) #stack boolena mask
+    """
+    X = np.hstack([states[idx][:, 1:] for idx in range(len(states))])  # stack all continuous latent states (ignore initial starting point)
+    X = np.vstack((X, np.ones(X[0, :].size)))   # append a vecor of ones for affine term
+    Y = np.hstack(spikes)  # stack all spike trains
+    W = np.hstack(Omega)  # stack all spike polya-gamma rvs
+    boolean_mask = np.hstack(mask)  # stack boolena mask
 
-    #Mask missing spike trains
+    # Mask missing spike trains
     X = X[:, boolean_mask]
     Y = Y[:, boolean_mask]
     W = W[:, boolean_mask]
@@ -156,8 +156,8 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
         # Sample from mvn posterior
         C[neuron, :] = npr.multivariate_normal(np.array(mu_post).ravel(), Sigma_post)
 
-    if normalize: #If true then normalize columns of C (except the last column which is the affine term)
-        #Normalize columns of C
+    if normalize:  # If true then normalize columns of C (except the last column which is the affine term)
+        # Normalize columns of C
         C_temp = C[:, :-1]
         L = np.diag(np.matmul(C_temp.T, C_temp))
         L = np.diag(np.power(L, -0.5))
