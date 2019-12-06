@@ -242,8 +242,8 @@ def leaf_dynamics(Y, X, nu, Lambda, M, V, draw_prior):
 
 # In[8]:
 def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth, D_input):
-    '''
-    Sampling the discrete latent wrt to the leaves of the tree whic is equivalent to sampling a path in the tree. We are
+    """
+    Sampling the discrete latent wrt to the leaves of the tree which is equivalent to sampling a path in the tree. We are
     assuming the recurrence-only framework from Linderman et al. AISTATS 2017.
     :param Z: list of discrete latent used to store the sampled leaf nodes.
     :param paths: list of paths taken used to store the sampled paths.
@@ -257,7 +257,7 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
     :param depth: maximum depth of tree
     :param D_input: dimension of input
     :return: Z, paths with sampled leaf nodes and paths.
-    '''
+    """
     Qinv = Q + 0
     Qlogdet = np.ones(K)
     for k in range(K):
