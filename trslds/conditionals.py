@@ -378,27 +378,28 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
 
             P[:, :, t + 1] = np.array((P_temp + P_temp.T) / 2) + 1e-8 * iden  # Numerical stability
 
-        """
-        Sample backwards
-        """
+        "Sample backwards"
         # X[idx][:, -1] = np.random.multivariate_normal(np.array(X[idx][:, -1]).ravel(), P[:, :, X[idx][0, :].size - 1])
         X[idx][:, -1] = X[idx][:, -1] + (
                     np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
 
         for t in range(X[idx][0, :].size - 2, -1, -1):
             # Load in alpha and lambda
-            alpha = alphas[:, t]
+            alpha = alphas[:, t][:, na]
             Lambda = Lambdas[:, :, t]
 
             A_tot = As[:, :-D_bias, int(Z[idx][t])]
             B_tot = As[:, -D_bias:, int(Z[idx][t])][:, na]
             Q = Qs[:, :, int(Z[idx][t])]
 
-            Pn = Lambda - np.matmul(Lambda, np.matmul(A_tot.T,
-                                                      np.linalg.solve(Q + np.matmul(np.matmul(A_tot, Lambda), A_tot.T),
-                                                                      np.matmul(A_tot, Lambda))))
-            mu_n = np.matmul(Pn, np.linalg.solve(Lambda, alpha)[:, na] + np.matmul(A_tot.T,
-                                                np.linalg.solve(Q, X[idx][:, t + 1][:, na] - np.matmul(B_tot, U[idx][:, t]))))
+            Pn = Lambda - Lambda @ A_tot.T @ np.linalg.solve(Q + A_tot @ Lambda @ A_tot.T, A_tot @ Lambda)
+
+            # Pn = Lambda - np.matmul(Lambda, np.matmul(A_tot.T,
+            #                                           np.linalg.solve(Q + np.matmul(np.matmul(A_tot, Lambda), A_tot.T),
+            #                                                           np.matmul(A_tot, Lambda))))
+            mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ np.linalg.solve(Q, X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t]))
+            # mu_n = np.matmul(Pn, np.linalg.solve(Lambda, alpha)[:, na] + np.matmul(A_tot.T,
+            #                                     np.linalg.solve(Q, X[idx][:, t + 1][:, na] - np.matmul(B_tot, U[idx][:, t]))))
 
             # To ensure PSD of matrix
             Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
