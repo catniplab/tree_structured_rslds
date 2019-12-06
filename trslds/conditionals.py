@@ -290,12 +290,12 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
 
 # In[9]:
 def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
-          alphas, Lambdas, R, depth, omegay=None, bern=False):
-    '''
+          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1):
+    """
     Polya-Gamma augmented kalman filter for sampling the continuous latent states
     :param D_in: dimension of latent space
     :param D_bias: dimension of input
-    :param X: list of continuous latnet states. Used to store sampled.
+    :param X: list of continuous latent states. Used to store samples.
     :param U: list of inputs
     :param P: A 3D array used to store computed covariance matrices
     :param As: Dynamics of leaf nodes
@@ -307,21 +307,21 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     :param Z: list of discrete latent states
     :param omega: list of polya-gamma rvs
     :param alphas: used to store prior mean for each time step
-    :param Lambdas: used to store prior covaraince for each time step
+    :param Lambdas: used to store prior covariance for each time step
     :param R: hyperplanes
     :param depth: maximum depth of tree
+    :param bern: flag indicating whether likelihood is binomial or not
+    :param N: N parameter in binomial distribution
     :return: sampled continuous latent states stored in X
-    '''
-    iden = np.eye(D_in)
-    
-    
-    
+    """
+
+    iden = np.eye(D_in)  # pre compute
     "Filter forward"
     for idx in range(len(X)):
         for t in range(X[idx][0, :].size - 1):
 
             if depth == 1:
-                alpha = X[idx][:, t] + 0  # If tree is of depth one then just run kalman filter
+                alpha = X[idx][:, t][:, na] + 0  # If tree is of depth one then just run kalman filter
                 Lambda = P[:, :, t] + 0
             else:
                 # Multiply product of PG augmented potentials and the last posterior
@@ -330,7 +330,7 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                 for d in range(depth - 1):
                     loc = paths[idx][d, t]  # What node did you stop at
                     fin = paths[idx][d + 1, t]  # Where did you go from current node
-                    if np.isnan(fin) != True:
+                    if ~np.isnan(fin):
                         k = 0.5 * (fin % 2 == 1) - 0.5 * (
                                 fin % 2 == 0)  # Did you go left (ODD) or right (EVEN) from current node in tree
                         tempR = np.expand_dims(R[d][:-1, int(loc - 1)], axis=1)
@@ -340,35 +340,41 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
                 Pinv = np.linalg.inv(P[:, :, t])
                 Lambda = np.linalg.inv(Pinv + J)
                 alpha = Lambda @ (Pinv @ X[idx][:, t][:, na] + temp_mu.T)
-                
 
             # Store alpha and Lambda for later use
             alphas[:, t] = alpha.flatten() + 0
             Lambdas[:, :, t] = Lambda + 0
             # Prediction
             Q = Qs[:, :, int(Z[idx][t])] + 0
-            x_prior = (As[:, :-D_bias, int(Z[idx][t])] @ alpha + \
-                        As[:, -D_bias:, int(Z[idx][t])] @ U[idx][:, t][:, na]).flatten()
-
-            P_prior = np.matmul(np.matmul(As[:, :-D_bias, int(Z[idx][t])], Lambda),
-                                As[:, :-D_bias, int(Z[idx][t])].T) + Q
-            if bern: #If observations are bernoulli
-                kt = Y[idx][:, t] - 0.5
+            x_prior = As[:, :-D_bias, int(Z[idx][t])] @ alpha + As[:, -D_bias:, int(Z[idx][t])] @ U[idx][:, t][:, na]
+            P_prior = As[:, :-D_bias, int(Z[idx][t])] @ Lambda @ As[:, :-D_bias, int(Z[idx][t])].T + Q
+            # P_prior = np.matmul(np.matmul(As[:, :-D_bias, int(Z[idx][t])], Lambda),
+            #                     As[:, :-D_bias, int(Z[idx][t])].T) + Q
+            if bern:  # If observations are bernoulli
+                kt = Y[idx][:, t] - N / 2
                 S = np.diag(1 / omegay[idx][:, t])
-            
-                
-            # Compute Kalman gain
-            K = np.matmul(P_prior, np.linalg.solve(np.matmul(np.matmul(C[:, :-1], P_prior),
-                                                             C[:, :-1].T) + S, C[:, :-1]).T)
-            
-            # Correction of estimate
-            if bern:
-                X[idx][:, t + 1] = x_prior + np.matmul(K,  
-             kt/omegay[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1])
-                
+                yt = kt / omegay[:, t]
             else:
-                X[idx][:, t + 1] = x_prior + np.matmul(K, (Y[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1]))
-            P_temp = np.matmul((iden - np.matmul(K, C[:, :-1])), P_prior)
+                yt = Y[idx][:, t]
+
+            # Compute Kalman gain
+            K = P_prior @ np.linalg.solve(C[:, :-1] @ P_prior @ C[:, :-1].T + S, C[:, :-1]).T
+
+            # K = np.matmul(P_prior, np.linalg.solve(np.matmul(np.matmul(C[:, :-1], P_prior),
+            #                                                  C[:, :-1].T) + S, C[:, :-1]).T)
+
+            # Correction of estimate
+            X[idx][:, t + 1] = (x_prior + K @ (yt[:, na] - C[:, :-1] @ x_prior - C[:, -1][:, na])).flatten()
+            # if bern:
+            #     X[idx][:, t + 1] = x_prior + (K @ (kt / omegay[idx][:, t] - C[:, :-1] @ x_prior - C[:, -1][:, na])).flatten()
+            #  #    X[idx][:, t + 1] = x_prior + np.matmul(K,
+            #  # kt/omegay[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1])
+            #
+            # else:
+            #     X[idx][:, t + 1] = x_prior + (K @ (Y[idx][:, t] - C[:, :-1] @ x_prior - C[:, -1][:, na])).flatten()
+                # X[idx][:, t + 1] = x_prior + np.matmul(K, (Y[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1]))
+            P_temp = (iden - K @ C[:, :-1]) @ P_prior
+            # P_temp = np.matmul((iden - np.matmul(K, C[:, :-1])), P_prior)
 
             P[:, :, t + 1] = np.array((P_temp + P_temp.T) / 2) + 1e-8 * iden  # Numerical stability
 
