@@ -348,8 +348,6 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             Q = Qs[:, :, int(Z[idx][t])] + 0
             x_prior = As[:, :-D_bias, int(Z[idx][t])] @ alpha + As[:, -D_bias:, int(Z[idx][t])] @ U[idx][:, t][:, na]
             P_prior = As[:, :-D_bias, int(Z[idx][t])] @ Lambda @ As[:, :-D_bias, int(Z[idx][t])].T + Q
-            # P_prior = np.matmul(np.matmul(As[:, :-D_bias, int(Z[idx][t])], Lambda),
-            #                     As[:, :-D_bias, int(Z[idx][t])].T) + Q
             if bern:  # If observations are bernoulli
                 kt = Y[idx][:, t] - N / 2
                 S = np.diag(1 / omegay[idx][:, t])
@@ -360,26 +358,13 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             # Compute Kalman gain
             K = P_prior @ np.linalg.solve(C[:, :-1] @ P_prior @ C[:, :-1].T + S, C[:, :-1]).T
 
-            # K = np.matmul(P_prior, np.linalg.solve(np.matmul(np.matmul(C[:, :-1], P_prior),
-            #                                                  C[:, :-1].T) + S, C[:, :-1]).T)
-
             # Correction of estimate
             X[idx][:, t + 1] = (x_prior + K @ (yt[:, na] - C[:, :-1] @ x_prior - C[:, -1][:, na])).flatten()
-            # if bern:
-            #     X[idx][:, t + 1] = x_prior + (K @ (kt / omegay[idx][:, t] - C[:, :-1] @ x_prior - C[:, -1][:, na])).flatten()
-            #  #    X[idx][:, t + 1] = x_prior + np.matmul(K,
-            #  # kt/omegay[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1])
-            #
-            # else:
-            #     X[idx][:, t + 1] = x_prior + (K @ (Y[idx][:, t] - C[:, :-1] @ x_prior - C[:, -1][:, na])).flatten()
-                # X[idx][:, t + 1] = x_prior + np.matmul(K, (Y[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1]))
             P_temp = (iden - K @ C[:, :-1]) @ P_prior
-            # P_temp = np.matmul((iden - np.matmul(K, C[:, :-1])), P_prior)
 
             P[:, :, t + 1] = np.array((P_temp + P_temp.T) / 2) + 1e-8 * iden  # Numerical stability
 
         "Sample backwards"
-        # X[idx][:, -1] = np.random.multivariate_normal(np.array(X[idx][:, -1]).ravel(), P[:, :, X[idx][0, :].size - 1])
         X[idx][:, -1] = X[idx][:, -1] + (
                     np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
 
@@ -393,13 +378,7 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             Q = Qs[:, :, int(Z[idx][t])]
 
             Pn = Lambda - Lambda @ A_tot.T @ np.linalg.solve(Q + A_tot @ Lambda @ A_tot.T, A_tot @ Lambda)
-
-            # Pn = Lambda - np.matmul(Lambda, np.matmul(A_tot.T,
-            #                                           np.linalg.solve(Q + np.matmul(np.matmul(A_tot, Lambda), A_tot.T),
-            #                                                           np.matmul(A_tot, Lambda))))
             mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ np.linalg.solve(Q, X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t]))
-            # mu_n = np.matmul(Pn, np.linalg.solve(Lambda, alpha)[:, na] + np.matmul(A_tot.T,
-            #                                     np.linalg.solve(Q, X[idx][:, t + 1][:, na] - np.matmul(B_tot, U[idx][:, t]))))
 
             # To ensure PSD of matrix
             Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
