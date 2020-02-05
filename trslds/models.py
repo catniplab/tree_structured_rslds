@@ -11,23 +11,25 @@ import scipy
 #4)Add recurrent dependecies
 #5)Compute log unnormalized posterior
 #6) Rewrite kalman filter in square root form
+
+
 class TroSLDS:
     'The recurrent only TrSLDS. This was the model showcased in Nassar et al. ICLR (2019)'
     def __init__(self, D_in, D_out, K, dynamics, dynamics_noise, emission, hyper_planes, possible_paths, leaf_path,
                  leaf_nodes, D_bias=1, nu=None, nuy=None, Lambda_x=None, Lambda_y=None, My=None, Vy=None,
                  mu_hyper=None, tau_hyper=None, Mx=None, Vx=None, bern=False, emission_noise=None, normalize=True,
-                 rotate=True, P0=None, scale=None):
-        self.D_in = D_in #Dimension of latent states
-        self.D_out = D_out #Dimension of observations
-        self.K = K #Number of discrete states
+                 rotate=True, P0=None, scale=None, N=1):
+        self.D_in = D_in  # Dimension of latent states
+        self.D_out = D_out  # Dimension of observations
+        self.K = K  # Number of discrete states
         self.depth = int(np.ceil(np.log2(K)) + 1)  # Find the maximum depth of the tree
-        self.x = [] #inital continuous latent states
-        self.u = [] # deterministic inputs
-        self.z = [] #inital discrete latent states
-        self.path = [] #Path taken to get to leaf node
-        self.y = [] #obervations of statements
+        self.x = []  # initial continuous latent states
+        self.u = []  # deterministic inputs
+        self.z = []  # initial discrete latent states
+        self.path = []  # Path taken to get to leaf node
+        self.y = []  # observations of statements
 
-        self.mask = []#Boolean mask to check for missing data. Missing data will be treated as NaNs.
+        self.mask = []  # Boolean mask to check for missing data. Missing data will be treated as NaNs.
         
         if scale is None:
             self.scale = 0.9
@@ -45,28 +47,26 @@ class TroSLDS:
 
         self.D_bias = D_bias  # Dimension of input.
 
-
-        self.A = dynamics #tree of dynamics
-        #dynamics of leaf nodes
+        self.A = dynamics  # tree of dynamics
+        # dynamics of leaf nodes
         self.Aleaf = np.ones((D_in, D_in + 1, K))
         self._obtain_leaf_dynamics()
-        self.Q = dynamics_noise #noise covariance matrices for leaf nodes
-        self.C = emission #inital emission parameter
-        if bern != True: #If observations are gaussian then initialize estimate of observation noise covariance
+        self.Q = dynamics_noise  # noise covariance matrices for leaf nodes
+        self.C = emission  # initial emission parameter
+        if bern != True:  # If observations are gaussian then initialize estimate of observation noise covariance
             if emission_noise is None:
                 self.S = np.eye(D_out)
             else:
                 self.S = emission_noise
 
-        self.R = hyper_planes #initial hyperplanes
+        self.R = hyper_planes  # initial hyperplanes
 
-
-        #hyperparameters for hyperplanes
+        # hyperparameters for hyperplanes
         if mu_hyper is tau_hyper is None:
             self.mu_hyper = np.zeros(D_in + 1)
             self.tau_hyper = 1e-4*np.eye(D_in + 1)
 
-        #hyperparameters for dynamics
+        # hyperparameters for dynamics
         if nu is Lambda_x is Mx is Vx is None:
             self.nux = D_in + 1
             self.lambdax = 1e-8*np.eye(D_in)
@@ -80,7 +80,7 @@ class TroSLDS:
             self.Mx = Mx
             self.Vx = Vx
 
-        #hyperparameters for emission
+        # hyperparameters for emission
         if nuy is Lambda_y is My is Vy is None:
             self.nuy = D_out + 1
             self.lambday = 1e-8*np.eye(D_out)
@@ -94,7 +94,7 @@ class TroSLDS:
             self.My = My
             self.Vy = Vy
 
-        #Prior on starting point of latent states
+        # Prior on starting point of latent states
         if P0 is None:
             self.P0 = 20*np.eye(D_in)
         else:
@@ -102,13 +102,14 @@ class TroSLDS:
 
         self.normalize = normalize
         self.rotate = rotate
-        self.bern = bern #Are the observations gaussian or bernoulli (spikes)
+        self.bern = bern  # Are the observations gaussian or bernoulli (spikes)
+        self.N = N  # Maximum number of spikes in a bin i.e. Binomial(N, p)
 
         # Used for storing values in kalman filter
         self.alphas = []
         self.covs = []
         
-        #Used for polya-gamma
+        # Used for polya-gamma
         self.omega = []
         if bern:
             self.spike_omega = []
@@ -135,9 +136,9 @@ class TroSLDS:
         self.omega = [None] * len(self.x)
         self.omega = conditionals.pg_tree_posterior(self.x, self.omega, self.R, self.path, self.depth)
 
-        if self.bern == True:
-            self.spike_omega = [None] * len(self.x) #Initalize the polya-gamma rvs for spike trains
-            self.spike_omega = conditionals.pg_spike_train(self.x, self.C, self.spike_omega, self.D_out)
+        if self.bern:
+            self.spike_omega = [None] * len(self.x)  # Initialize the polya-gamma rvs for spike trains
+            self.spike_omega = conditionals.pg_spike_train(self.x, self.C, self.spike_omega, self.D_out, N=self.N)
 
 
 # In[2]:
@@ -167,7 +168,7 @@ class TroSLDS:
             upper = upper @ rotate
             orthor = rotate @ orthor
 
-            #Contrain the emission matrix to be an upper matrix
+            # Contrain the emission matrix to be an upper matrix
             self.C[:, :-1] = upper
 
             "Rotate latent states and dynamics"
@@ -177,17 +178,17 @@ class TroSLDS:
 
 # In[4]:
     def _sample_hyperplanes(self):
-        if self.depth != 1: #If depth is 1 then just a Kalman Filter so no need to sample hyperplanes
+        if self.depth != 1:  # If depth is 1 then just a Kalman Filter so no need to sample hyperplanes
             self.R = utils.sample_hyperplanes(self.x, self.omega, self.path, self.depth, self.mu_hyper, self.tau_hyper,
                                               self.poss_paths, self.R)
 
 # In[5]:
     def _sample_dynamics(self):
-        #Sample leaf dynamics
+        # Sample leaf dynamics
         self.A, self.Q = utils.sample_leaf_dynamics(self.x, self.u, self.z, self.A, self.Q, self.nux, self.lambdax,
                                                     self.Mx, self.Vx, self.scale, self.leaf_nodes)
         self._obtain_leaf_dynamics()
-        #Sample dynamics of internal nodes
+        # Sample dynamics of internal nodes
         self.A = utils.sample_internal_dynamics(self.A, self.scale, self.Mx, self.Vx, self.depth)
 
 # In[6]:
