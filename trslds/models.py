@@ -4,6 +4,7 @@ from . import conditionals
 from . import utils
 from numpy import newaxis as na
 import scipy
+from tqdm import tqdm
 #To Do List:
 #1)Learn prior covariances
 #2)Allow for missing data
@@ -225,7 +226,15 @@ class TroSLDS:
                                             self.S, self.y, self.path, self.z, self.omega, self.alphas, self.covs,
                                             self.R, self.depth)
 
-
+# In[]
+    def resample(self, no_samples):
+        self._initialize_polya_gamma()  # Initialize polya-gamma rvs
+        for m in tqdm(range(no_samples)):
+            self._sample_emission()  # sample emission parameters
+            self._sample_hyperplanes()  # sample hyperplanes
+            self._sample_dynamics()  # Sample dynamics of tree
+            self._sample_discrete_latent()  # Sample discrete latent states
+            self._sample_continuous_latent()  # Sample continuous latent state
 # In[7]:
     def _generate_data(self, T, starting_pt, u=None, noise=True):
         if u is None:
