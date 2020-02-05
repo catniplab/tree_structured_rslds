@@ -73,7 +73,7 @@ def FitzHugh(dt, T, start):
 "Generate training data"
 D_in = 2
 D_out = 100
-K = 1
+K = 4
 no_realizations = 100
 T = 400
 dt = 0.1
