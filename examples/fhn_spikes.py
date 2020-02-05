@@ -18,7 +18,6 @@ colors_leaf = sns.xkcd_palette(color_names)
 npr.seed(0)
 
 
-
 def resample(no_samples, trslds):
     trslds._initialize_polya_gamma()  # Initialize polya-gamma rvs
     for m in tqdm(range(no_samples)):
@@ -30,6 +29,7 @@ def resample(no_samples, trslds):
     return trslds
 
 # In[]:
+
 
 def noisy_FitzHugh(dt, T, start):
     v=np.zeros(T + 1)
@@ -48,6 +48,7 @@ def noisy_FitzHugh(dt, T, start):
     states[0,:]=v
     states[1,:]=w
     return states
+
 
 def FitzHugh(dt, T, start):
     v=np.zeros(T + 1)
@@ -72,7 +73,7 @@ def FitzHugh(dt, T, start):
 "Generate training data"
 D_in = 2
 D_out = 100
-K = 4
+K = 1
 no_realizations = 100
 T = 400
 dt = 0.1
@@ -85,14 +86,15 @@ Y = []
 Ysmooth = []
 fig = plt.figure()
 ax = fig.add_subplot(111)
+N_max = 4
 for idx in range(D_out):
     xt = noisy_FitzHugh(dt, T, starting_pts[:, idx])
-    #Demean 
+    # Demean
     Xtrue.append(xt + 0)
     P = 1/(1 + np.exp(-(C[:, :-1] @ xt[:, 1:] + C[:, -1][:, na])))
-    yt = npr.binomial( 1, P)
+    yt = npr.binomial(N_max, P)
     Y.append(yt + 0)
-    #Smooth using gaussian kernel smoother
+    # Smooth using gaussian kernel smoother
     sigma = 25
     window = 400
     ysmooth = utils.gaussian_kernel_smoother(yt, sigma, window)
@@ -105,25 +107,25 @@ for idx in range(D_out):
 max_epochs = 200
 batch_size = 128
 lr = 0.0001
-#Instead of passing in spikes, pass in smoothed spikes to do PCA on
+# Instead of passing in spikes, pass in smoothed spikes to do PCA on
 A, C, R, X, Z, Path, possible_paths, leaf_path, leaf_nodes = init.initialize(Ysmooth, D_in, K, max_epochs, batch_size,
                                                                              lr)
 Qstart = np.repeat(np.eye(D_in)[:, :, na], K, axis=2)
 Sstart = np.eye(D_out)
 
-#Have to pass in bern=True for spike trains
+# Have to pass in bern=True for spike trains
 kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Qstart, 'emission': C,
           'emission_noise': Sstart,
           'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path, 'leaf_nodes': leaf_nodes,
-          'scale': 0.01, 'bern':True}
-trslds = TroSLDS(**kwargs) #Instantiiate the model
+          'scale': 0.01, 'bern': True, 'N': N_max}
+trslds = TroSLDS(**kwargs)  # Instantiate the model
 
 
-#Add data to model
+# Add data to model
 for idx in range(len(Y)):
     trslds._add_data(X[idx], Y[idx], Z[idx], Path[idx])
 
-#Visualize initalization of latent states to see if it looks okay
+# Visualize initalization of latent states to see if it looks okay
 fig = plt.figure()
 ax = fig.add_subplot(111)
 for idx in range(len(X)):
@@ -131,7 +133,7 @@ for idx in range(len(X)):
     
     
 # In[]:
-no_samples = 500 #For ICLR we ran for 1,000 samples but it converges rather quickly. 100 should be fine.
+no_samples = 500  # For ICLR we ran for 1,000 samples but it converges rather quickly. 100 should be fine.
 trslds = resample(no_samples, trslds)
 
 # In[]:
@@ -226,4 +228,3 @@ ax.set_ylim([ymin, ymax])
 
 fig.show()
 fig.tight_layout()
-    
