@@ -351,7 +351,7 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             if bern:  # If observations are bernoulli
                 kt = Y[idx][:, t] - N / 2
                 S = np.diag(1 / omegay[idx][:, t])
-                yt = kt / omegay[:, t]
+                yt = kt / omegay[idx][:, t]
             else:
                 yt = Y[idx][:, t]
 
