@@ -5,6 +5,10 @@ from . import utils
 from numpy import newaxis as na
 import scipy
 from tqdm import tqdm
+from joblib import Parallel, delayed
+from os import cpu_count
+
+n_cpu = int(cpu_count() / 2)
 #To Do List:
 #1)Learn prior covariances
 #2)Allow for missing data
@@ -211,18 +215,31 @@ class TroSLDS:
             max_len = max([self.x[idx][0, :].size for idx in range(len(self.x))])
             self.alphas = np.zeros((self.D_in, max_len))
             self.covs = np.repeat(self.P0[:, :, na], max_len, axis=2)
-        
-        P = np.repeat(self.P0[:, :, na], self.alphas[0, :].size, axis=2)
+
+        # P = np.repeat(self.P0[:, :, na], self.alphas[0, :].size, axis=2)
         if self.bern:  # If outputs are spikes
             self._sample_pg()  # sample polya-gamma associated with tree
             self._sample_spike_pg()  # sample polya-gamma associated with spikes
-            self.x = conditionals.pg_kalman(self.D_in, self.D_bias, self.x, self.u, P, self.Aleaf, self.Q,
-                                                  self.C, 0, self.y, self.path, self.z, self.omega,
-                                                  self.alphas, self.covs, self.R, self.depth, self.spike_omega,
-                                                  self.bern)
+
+            temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.parallel_pg_kalman)(self.D_in, self.D_bias, self.x[n],
+                                                                             self.u[n], self.covs, self.Aleaf, self.Q,
+                                                                             self.C, 0, self.y[n], self.path[n],
+                                                                             self.z[n], self.omega[n], self.alphas,
+                                                                             self.covs, self.R, self.depth,
+                                                                             omegay=self.spike_omega[n],
+                                                                             bern=self.bern, N=self.N, identity=n)
+                                           for n in range(len(self.x)))
+            print(self.covs)
+            for n in range(len(self.x)):
+                temp_x, temp_idx = temps[n]
+                self.x[temp_idx] = temp_x
+            # self.x = conditionals.pg_kalman(self.D_in, self.D_bias, self.x, self.u, self.covs, self.Aleaf, self.Q,
+            #                                       self.C, 0, self.y, self.path, self.z, self.omega,
+            #                                       self.alphas, self.covs, self.R, self.depth, self.spike_omega,
+            #                                       self.bern, N=self.N)
         else:  # If outputs are gaussian
             self._sample_pg()
-            self.x = conditionals.pg_kalman(self.D_in, self.D_bias, self.x, self.u, P, self.Aleaf, self.Q, self.C,
+            self.x = conditionals.pg_kalman(self.D_in, self.D_bias, self.x, self.u, self.covs, self.Aleaf, self.Q, self.C,
                                             self.S, self.y, self.path, self.z, self.omega, self.alphas, self.covs,
                                             self.R, self.depth)
 
@@ -235,6 +252,7 @@ class TroSLDS:
             self._sample_dynamics()  # Sample dynamics of tree
             self._sample_discrete_latent()  # Sample discrete latent states
             self._sample_continuous_latent()  # Sample continuous latent state
+
 # In[7]:
     def _generate_data(self, T, starting_pt, u=None, noise=True):
         if u is None:

@@ -12,6 +12,9 @@ import pdb
 from os import cpu_count
 import time
 
+n_cpu = cpu_count()
+
+
 # In[1]:
 def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
     """
@@ -30,7 +33,7 @@ def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
         T = states[idx][0, :].size
         b = np.ones(T * (depth - 1))
         if nthreads is None:
-            nthreads = cpu_count()
+            nthreads = n_cpu
         v = np.ones((depth - 1, T))
         out = np.empty(T * (depth - 1))
         # Compute parameters for conditional
@@ -63,7 +66,7 @@ def pg_spike_train(X, C, Omega, D_out, nthreads=None, N=1):
         T = X[idx][0, 1:].size
         b = N * np.ones(T * D_out)
         if nthreads is None:
-            nthreads = cpu_count()
+            nthreads = n_cpu
         out = np.empty(T * D_out)
         V = C[:, :-1] @ X[idx][:, 1:] + C[:, -1][:, na]  # Ignore the first point of the time series
 
@@ -283,6 +286,105 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
     return Z, paths
 
 
+# In[]
+def parallel_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
+          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1, identity=0):
+    """
+    Polya-Gamma augmented kalman filter for sampling the continuous latent states
+    :param D_in: dimension of latent space
+    :param D_bias: dimension of input
+    :param X: list of continuous latent states. Used to store samples.
+    :param U: list of inputs
+    :param P: A 3D array used to store computed covariance matrices
+    :param As: Dynamics of leaf nodes
+    :param Qs: noise covariance matrices of leaf nodes
+    :param C: emission matrix (with affine term appended at the end)
+    :param S: emission noise covariance matrix
+    :param Y: list of observations of system
+    :param paths: paths taken
+    :param Z: list of discrete latent states
+    :param omega: list of polya-gamma rvs
+    :param alphas: used to store prior mean for each time step
+    :param Lambdas: used to store prior covariance for each time step
+    :param R: hyperplanes
+    :param depth: maximum depth of tree
+    :param bern: flag indicating whether likelihood is binomial or not
+    :param N: N parameter in binomial distribution
+    :return: sampled continuous latent states stored in X
+    """
+
+    iden = np.eye(D_in)  # pre compute
+    "Filter forward"
+    for t in range(X[0, :].size - 1):
+        if depth == 1:
+            alpha = X[:, t][:, na] + 0  # If tree is of depth one then just run kalman filter
+            Lambda = P[:, :, t] + 0
+        else:
+            # Multiply product of PG augmented potentials and the last posterior
+            J = 0
+            temp_mu = 0
+            for d in range(depth - 1):
+                loc = paths[d, t]  # What node did you stop at
+                fin = paths[d + 1, t]  # Where did you go from current node
+                if ~np.isnan(fin):
+                    k = 0.5 * (fin % 2 == 1) - 0.5 * (
+                            fin % 2 == 0)  # Did you go left (ODD) or right (EVEN) from current node in tree
+                    tempR = np.expand_dims(R[d][:-1, int(loc - 1)], axis=1)
+                    J += omega[d, t] * np.matmul(tempR, tempR.T)
+                    temp_mu += tempR.T * (k - omega[d, t] * R[d][-1, int(loc - 1)])
+
+            Pinv = np.linalg.inv(P[:, :, t])
+            Lambda = np.linalg.inv(Pinv + J)
+            alpha = Lambda @ (Pinv @ X[:, t][:, na] + temp_mu.T)
+
+        # Store alpha and Lambda for later use
+        alphas[:, t] = alpha.flatten() + 0
+        Lambdas[:, :, t] = Lambda + 0
+        # Prediction
+        Q = Qs[:, :, int(Z[t])] + 0
+        x_prior = As[:, :-D_bias, int(Z[t])] @ alpha + As[:, -D_bias:, int(Z[t])] @ U[:, t][:, na]
+        P_prior = As[:, :-D_bias, int(Z[t])] @ Lambda @ As[:, :-D_bias, int(Z[t])].T + Q
+        if bern:  # If observations are bernoulli
+            kt = Y[:, t] - N / 2
+            S = np.diag(1 / omegay[:, t])
+            yt = kt / omegay[:, t]
+        else:
+            yt = Y[:, t]
+
+        # Compute Kalman gain
+        K = P_prior @ np.linalg.solve(C[:, :-1] @ P_prior @ C[:, :-1].T + S, C[:, :-1]).T
+
+        # Correction of estimate
+        X[:, t + 1] = (x_prior + K @ (yt[:, na] - C[:, :-1] @ x_prior - C[:, -1][:, na])).flatten()
+        P_temp = (iden - K @ C[:, :-1]) @ P_prior
+
+        P[:, :, t + 1] = np.array((P_temp + P_temp.T) / 2) + 1e-8 * iden  # Numerical stability
+
+    "Sample backwards"
+    eps = npr.normal(size=X.shape)
+    X[:, -1] = X[:, -1] + (np.linalg.cholesky(P[:, :, X[0, :].size - 1]) @ eps[:, -1][:, na]).ravel()
+
+    for t in range(X[0, :].size - 2, -1, -1):
+        # Load in alpha and lambda
+        alpha = alphas[:, t][:, na]
+        Lambda = Lambdas[:, :, t]
+
+        A_tot = As[:, :-D_bias, int(Z[t])]
+        B_tot = As[:, -D_bias:, int(Z[t])][:, na]
+        Q = Qs[:, :, int(Z[t])]
+
+        Pn = Lambda - Lambda @ A_tot.T @ np.linalg.solve(Q + A_tot @ Lambda @ A_tot.T, A_tot @ Lambda)
+        mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ np.linalg.solve(Q, X[:, t + 1][:, na] - B_tot @ U[:, t]))
+
+        # To ensure PSD of matrix
+        Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
+
+        # Sample
+        X[:, t] = (mu_n + np.linalg.cholesky(Pn) @ eps[:, t][:, na]).ravel()
+    return X, identity
+
+
+
 # In[9]:
 def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
           alphas, Lambdas, R, depth, omegay=None, bern=False, N=1):
@@ -314,6 +416,7 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     "Filter forward"
     for idx in range(len(X)):
         for t in range(X[idx][0, :].size - 1):
+            # start_time = time.time()
             if depth == 1:
                 alpha = X[idx][:, t][:, na] + 0  # If tree is of depth one then just run kalman filter
                 Lambda = P[:, :, t] + 0
@@ -381,6 +484,8 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
 
             # Sample
             X[idx][:, t] = (mu_n + np.linalg.cholesky(Pn) @ eps[:, t][:, na]).ravel()
+        # end_time = time.time()
+        # print(end_time - start_time)
 
     return X
 
