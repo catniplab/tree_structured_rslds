@@ -12,7 +12,7 @@ import pdb
 from os import cpu_count
 import time
 
-n_cpu = cpu_count()
+n_cpu = int(cpu_count() / 2)
 
 
 # In[1]:
