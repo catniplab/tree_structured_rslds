@@ -229,7 +229,6 @@ class TroSLDS:
                                                                              omegay=self.spike_omega[n],
                                                                              bern=self.bern, N=self.N, identity=n)
                                            for n in range(len(self.x)))
-            print(self.covs)
             for n in range(len(self.x)):
                 temp_x, temp_idx = temps[n]
                 self.x[temp_idx] = temp_x
