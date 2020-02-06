@@ -10,6 +10,8 @@ import copy
 from tqdm import tqdm
 from scipy.ndimage import filters
 from scipy.signal import gaussian
+from numba import njit, jit
+
 # In[1]:
 def compute_ss_mniw(X, Y, nu, Lambda, M, V ):
     '''
@@ -152,7 +154,6 @@ def sample_leaf_dynamics(states, inputs, discrete_states, A, Q, nu, lambdax, Mx,
     return A, Q
 
 
-
 # In[8]:
 def sigmoid(x):
     "Numerically stable sigmoid function."
@@ -165,10 +166,28 @@ def sigmoid(x):
         z = np.exp(x)
         return z / (1 + z)
 
+
+# In[]
+def sigmoid_vectorized(x):
+    z = np.zeros(x.size)
+    z[x >= 0] = 1 / (1 + np.exp(-x[x >= 0]))
+    z[x < 0] = np.exp(x[x < 0]) / (1 + np.exp(x[x < 0]))
+    return z
+
+
 # In[9]:
-def log_mvn(x, mu, sigma, tau, logdet):
-#    return -0.5*np.log(np.linalg.det(2*np.pi*sigma))-0.5*np.matmul(np.linalg.solve(sigma, x-mu).T, x-mu)
-    return -0.5*logdet-0.5 * (x - mu)[na, :] @ tau @ (x - mu)[:, na]
+# @njit
+def log_mvn(x, mu, tau, logdet):
+    """
+    Easy way to compute log multivariate normal with same covariance but different means
+    :param x: data, D (dimension) by N (data points)
+    :param mu: means, D  by N
+    :param tau: D by D inverse covariance
+    :param logdet: logdet of tau
+    :return:
+    """
+    return np.diag(-0.5 * logdet-0.5 * (x - mu).T @ tau @ (x - mu))
+
 
 # In[10]:
 def compute_leaf_log_prob(R, x, K, depth, leaf_paths):
@@ -185,6 +204,25 @@ def compute_leaf_log_prob(R, x, K, depth, leaf_paths):
                     log_prob[k] += np.log(sigmoid(v))
                 else:
                     log_prob[k] += np.log(sigmoid(-v))
+    return log_prob
+
+
+# In[10]:
+# @njit
+def compute_leaf_log_prob_vectorized(R, x, K, depth, leaf_paths):
+    # Generate discrete latent states
+    log_prob = np.zeros((K, x[0, :].size))
+    for k in range(K):
+        "Compute prior probabilities of each path"
+        for level in range(depth - 1):
+            node = int(leaf_paths[level, k])
+            child = leaf_paths[level + 1, k]
+            if ~np.isnan(child):
+                v = (R[level][:-1, node - 1][na, :] @ x).flatten() + R[level][-1, node - 1]
+                if int(child) % 2 == 1:  # If odd then you went left
+                    log_prob[k, :] = log_prob[k, :] + np.log(sigmoid_vectorized(v))
+                else:
+                    log_prob[k, :] = log_prob[k, :] + np.log(sigmoid_vectorized(-v))
     return log_prob
 
 # In[11]:

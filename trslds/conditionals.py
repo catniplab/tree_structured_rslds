@@ -7,10 +7,10 @@ from numpy.linalg import LinAlgError
 from scipy.stats import invwishart
 from pypolyagamma import PyPolyaGamma
 import pypolyagamma
-from numba import jit
+from numba import njit, jit
 import pdb
 from os import cpu_count
-
+import time
 
 # In[1]:
 def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
@@ -262,26 +262,21 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
     Qlogdet = np.ones(K)
     for k in range(K):
         Qinv[:, :, k] = np.linalg.inv(Q[:, :, k])
-        Qlogdet[k] = np.log(np.linalg.det(2 * np.pi * Q[:, :, k]))
-    log_trans = np.ones(K)
+        Qlogdet[k] = np.log(np.linalg.det(Q[:, :, k]))
+
     for idx in range(len(X)):
+        log_p = utils.compute_leaf_log_prob_vectorized(R, X[idx], K, depth, leaf_path)
+
+        "Compute transition probability for each leaf"
+        temp = X[idx][:, 1:]
+        for k in range(K):
+            mu_temp = A[:, :-D_input, k] @ X[idx][:, :-1] + A[:, -D_input:, k] @ U[idx][:, :-1]
+            log_p[k, :-1] += utils.log_mvn(temp, mu_temp, Qinv[:, :, k], Qlogdet[k])
+
+        post_unnorm = np.exp(log_p - np.max(log_p, 0))
+        post_p = post_unnorm / np.sum(post_unnorm, 0)  # Normalize to make a valid density
         for t in range(X[idx][0, :].size):
-
-            log_trans = 0 * log_trans
-            log_prior_prob = utils.compute_leaf_log_prob(R, X[idx][:, t], K, depth, leaf_path)
-
-            if t != X[idx][0, :].size - 1:
-                for k in range(K):
-                    "Compute transition probability for each leaf"
-                    log_trans[k] = utils.log_mvn(X[idx][:, t + 1], np.matmul(A[:, :-D_input, k], X[idx][:, t]) +
-                                           np.matmul(A[:, -D_input:, k], U[idx][:, t]), Q[:, :, k], Qinv[:, :, k],
-                                           Qlogdet[k])
-
-            log_p = log_trans + log_prior_prob  # Sum up prior and transition
-            post_unnorm = np.exp(log_p - np.max(log_p))
-            post_p = post_unnorm / np.sum(post_unnorm)  # Normalize to make a valid density
-
-            choice = npr.multinomial(1, post_p, size=1)
+            choice = npr.multinomial(1, post_p[:, t], size=1)
             paths[idx][:, t] = leaf_path[:, np.where(choice[0, :] == 1)[0][0]].ravel()
             Z[idx][t] = np.where(choice[0, :] == 1)[0][0]
 
@@ -319,7 +314,6 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     "Filter forward"
     for idx in range(len(X)):
         for t in range(X[idx][0, :].size - 1):
-
             if depth == 1:
                 alpha = X[idx][:, t][:, na] + 0  # If tree is of depth one then just run kalman filter
                 Lambda = P[:, :, t] + 0
@@ -365,8 +359,10 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             P[:, :, t + 1] = np.array((P_temp + P_temp.T) / 2) + 1e-8 * iden  # Numerical stability
 
         "Sample backwards"
-        X[idx][:, -1] = X[idx][:, -1] + (
-                    np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
+        eps = npr.normal(size=X[idx].shape)
+        X[idx][:, -1] = X[idx][:, -1] + (np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ eps[:, -1][:, na]).ravel()
+        # X[idx][:, -1] = X[idx][:, -1] + (
+        #             np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
 
         for t in range(X[idx][0, :].size - 2, -1, -1):
             # Load in alpha and lambda
@@ -384,7 +380,7 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
 
             # Sample
-            X[idx][:, t] = (mu_n + np.linalg.cholesky(Pn) @ npr.normal(size=D_in)[:, na]).ravel()
+            X[idx][:, t] = (mu_n + np.linalg.cholesky(Pn) @ eps[:, t][:, na]).ravel()
 
     return X
 
