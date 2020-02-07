@@ -13,9 +13,11 @@ color_names = ["windows blue", "leaf green","red", "orange"]
 colors_leaf = sns.xkcd_palette(color_names)
 npr.seed(0)
 
-D_in = 2 #Dimension of latent states
-D_out = 2 #Dimension of observation space
-K = 4 #Number of possible discrete latent states
+D_in = 2  # Dimension of latent states
+D_out = 2  # Dimension of observation space
+K = 4  # Number of possible discrete latent states
+
+
 # In[]:
 def simulate_tree_nascar(no_realizations, Tmin=400, Tmax=800):
     # Create the tree
@@ -84,6 +86,7 @@ def simulate_tree_nascar(no_realizations, Tmin=400, Tmax=800):
 
     return Xreal, Yreal, Zreal, true_model
 
+
 # In[]:
 def resample(no_samples, trslds):
     trslds._initialize_polya_gamma()  # Initialize polya-gamma rvs
@@ -96,12 +99,12 @@ def resample(no_samples, trslds):
 
     return trslds
 
+
 # In[]:
 if __name__ == "__main__":
-    #First generate data from true model
+    # First generate data from true model
     no_realizations = 50
     Xtrue, Y, Ztrue, true_model = simulate_tree_nascar(no_realizations)
-
 
     "Lets see if we can learn the model using TrSLDS. First, let's initialize the parameters."
     batch_size = 256
@@ -116,21 +119,21 @@ if __name__ == "__main__":
               'emission_noise': Sstart,
               'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path, 'leaf_nodes': leaf_nodes,
               'scale': 0.5}
-    trslds = TroSLDS(**kwargs) #Instantiiate the model
+    trslds = TroSLDS(**kwargs)  # Instantiate the model
 
-    #Add data to model
+    # Add data to model
     for idx in range(len(Y)):
         trslds._add_data(X[idx], Y[idx], Z[idx], Path[idx])
 
-
-    #Perform Gibbs to train the model
+    # Perform Gibbs to train the model
     no_samples = 100
     trslds = resample(no_samples, trslds)
 
-   #Obtain transformation matrix from inferred latent space to true latent space
+    # Obtain transformation matrix from inferred latent space to true latent space
     transform = utils.projection(Xtrue, trslds.x)
     Xinferr = trslds.x
-    #Project inferred latent space to true latent space
+
+    # Project inferred latent space to true latent space
     Xinferr = [transform[:, :-1] @ Xinferr[idx] + transform[:, -1][:, na] for idx in range(len(Xinferr))]
     Zinferr = trslds.z
 
@@ -140,7 +143,7 @@ if __name__ == "__main__":
                                 trslds.Mx, trslds.Vx, trslds.scale, trslds.leaf_nodes, K, trslds.depth, 10000)
 
 # In[]:
-    fig = plt.figure()
+    fig = plt.figure(figsize=(12, 8))
     gs = gridspec.GridSpec(2, 3)
 
     # Plot true latent states colored by true discrete state
@@ -167,7 +170,7 @@ if __name__ == "__main__":
     ax.set_ylim(ylim)
 
 # In[]
-    #Plot true vector field and color by discrete state
+    # Plot true vector field and color by discrete state
     ax = fig.add_subplot(gs[0, 1])
     xmin = xlim[0]
     xmax = xlim[1]
@@ -199,7 +202,7 @@ if __name__ == "__main__":
     ax.set_ylabel('$x_2$')
 
 # In[]
-    #Plot inferred vector field and color by discrete state
+    # Plot inferred vector field and color by discrete state
     ax = fig.add_subplot(gs[1, 1])
     X, Y, arrows = plotting.rot_vector_field(At[-1], trslds.R, xmin, xmax, ymin, ymax, delta, trslds.depth,
                                              trslds.leaf_paths,
@@ -228,7 +231,7 @@ if __name__ == "__main__":
     ax.set_ylabel('$x_2$')
 
 # In[]
-    #Plot vector field of root node
+    # Plot vector field of root node
     ax = fig.add_subplot(gs[0, 2])
     root_depth = 1
     root_K = 1
@@ -248,7 +251,7 @@ if __name__ == "__main__":
 
 
 # In[]
-    #Plot vector field of second layer
+    # Plot vector field of second layer
     ax = fig.add_subplot(gs[1, 2])
     second_depth = 2
     second_K = 2
