@@ -133,7 +133,7 @@ for idx in range(len(X)):
     
     
 # In[]:
-no_samples = 500  # For ICLR we ran for 1,000 samples but it converges rather quickly. 100 should be fine.
+no_samples = 50  # For ICLR we ran for 1,000 samples but it converges rather quickly. 100 should be fine.
 trslds = resample(no_samples, trslds)
 
 # In[]:
