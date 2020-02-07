@@ -119,7 +119,7 @@ def emission_parameters(obsv, states, mask, nu, Lambda, M, V, normalize=True):
 
 
 # In[4]:
-def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, normalize=True):
+def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, normalize=True, N=1):
     """
     Sample from conditional posterior of emission parameters where emission model is a bernoulli glm.
     :param spikes: list of spike trains
@@ -153,7 +153,7 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
         xw_tilde = np.multiply(X, np.sqrt(W[neuron, :]))  # pre multiply by sqrt(w_n,t )
         Lambda_post += np.einsum('ij,ik->jk', xw_tilde.T, xw_tilde.T)  # Use einstein summation to compute sum of outer products
 
-        temp_mu += np.sum((X * (Y[neuron, :][na, :] - 0.5)).T, axis=0)
+        temp_mu += np.sum((X * (Y[neuron, :][na, :] - N / 2)).T, axis=0)
         Sigma_post = np.linalg.inv(Lambda_post)
         mu_post = np.matmul(temp_mu, Sigma_post)
         # Sample from mvn posterior
@@ -171,7 +171,6 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
 
 
 # In[5]:
-#@jit(nopython=True)
 def hyper_planes(w, x, z, prior_mu, prior_precision, draw_prior):
     """
     Sample from the conditional posterior of the hyperplane. Due to the polya-gamma augmentation, the model is normal.
@@ -287,8 +286,8 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
 
 
 # In[]
-def parallel_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
-          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1, identity=0):
+def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
+          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1, marker=1):
     """
     Polya-Gamma augmented kalman filter for sampling the continuous latent states
     :param D_in: dimension of latent space
@@ -314,6 +313,12 @@ def parallel_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     """
 
     iden = np.eye(D_in)  # pre compute
+    # Pre-compute the inverse of the noise covariance for sampling backwards
+    Qinvs = np.zeros((D_in, D_in, Qs[0, 0, :].size))
+    for k in range(Qs[0, 0, :].size):
+        temp = np.linalg.inv(np.linalg.cholesky(Qs[:, :, k]))
+        Qinvs[:, :, k] = temp.T @ temp
+
     "Filter forward"
     for t in range(X[0, :].size - 1):
         if depth == 1:
@@ -363,6 +368,8 @@ def parallel_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     "Sample backwards"
     eps = npr.normal(size=X.shape)
     X[:, -1] = X[:, -1] + (np.linalg.cholesky(P[:, :, X[0, :].size - 1]) @ eps[:, -1][:, na]).ravel()
+    # X[idx][:, -1] = X[idx][:, -1] + (
+    #             np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
 
     for t in range(X[0, :].size - 2, -1, -1):
         # Load in alpha and lambda
@@ -372,21 +379,22 @@ def parallel_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
         A_tot = As[:, :-D_bias, int(Z[t])]
         B_tot = As[:, -D_bias:, int(Z[t])][:, na]
         Q = Qs[:, :, int(Z[t])]
+        Qinv = Qinvs[:, :, int(Z[t])]
 
         Pn = Lambda - Lambda @ A_tot.T @ np.linalg.solve(Q + A_tot @ Lambda @ A_tot.T, A_tot @ Lambda)
-        mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ np.linalg.solve(Q, X[:, t + 1][:, na] - B_tot @ U[:, t]))
+        # mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ np.linalg.solve(Q, X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t]))
+        mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ Qinv @(X[:, t + 1][:, na] - B_tot @ U[:, t]))
 
         # To ensure PSD of matrix
         Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
 
         # Sample
         X[:, t] = (mu_n + np.linalg.cholesky(Pn) @ eps[:, t][:, na]).ravel()
-    return X, identity
-
+    return X, marker
 
 
 # In[9]:
-def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
+def pg_kalman_batch(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
           alphas, Lambdas, R, depth, omegay=None, bern=False, N=1):
     """
     Polya-Gamma augmented kalman filter for sampling the continuous latent states
@@ -413,6 +421,12 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
     """
 
     iden = np.eye(D_in)  # pre compute
+    # Pre-compute the inverse of the noise covariance for sampling backwards
+    Qinvs = np.zeros((D_in, D_in, Qs[0, 0, :].size))
+    for k in range(Qs[0, 0, :].size):
+        temp = np.linalg.inv(np.linalg.cholesky(Qs[:, :, k]))
+        Qinvs[:, :, k] = temp.T @ temp
+
     "Filter forward"
     for idx in range(len(X)):
         for t in range(X[idx][0, :].size - 1):
@@ -475,133 +489,15 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             A_tot = As[:, :-D_bias, int(Z[idx][t])]
             B_tot = As[:, -D_bias:, int(Z[idx][t])][:, na]
             Q = Qs[:, :, int(Z[idx][t])]
+            Qinv = Qinvs[:, :, int(Z[idx][t])]
 
             Pn = Lambda - Lambda @ A_tot.T @ np.linalg.solve(Q + A_tot @ Lambda @ A_tot.T, A_tot @ Lambda)
-            mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ np.linalg.solve(Q, X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t]))
+            # mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ np.linalg.solve(Q, X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t]))
+            mu_n = Pn @ (np.linalg.solve(Lambda, alpha) + A_tot.T @ Qinv @(X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t]))
 
             # To ensure PSD of matrix
             Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
 
             # Sample
             X[idx][:, t] = (mu_n + np.linalg.cholesky(Pn) @ eps[:, t][:, na]).ravel()
-        # end_time = time.time()
-        # print(end_time - start_time)
-
     return X
-
-
-# In[]:
-def chol_pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
-              alphas, Lambdas, R, depth, omegay=None, bern=False):
-    '''
-    Polya-Gamma augmented kalman filter for sampling the continuous latent states
-    :param D_in: dimension of latent space
-    :param D_bias: dimension of input
-    :param X: list of continuous latnet states. Used to store sampled.
-    :param U: list of inputs
-    :param P: A 3D array used to store computed covariance matrices
-    :param As: Dynamics of leaf nodes
-    :param Qs: noise covariance matrices of leaf nodes
-    :param C: emission matrix (with affine term appended at the end)
-    :param S: emission noise covariance matrix
-    :param Y: list of observations of system
-    :param paths: paths taken
-    :param Z: list of discrete latent states
-    :param omega: list of polya-gamma rvs
-    :param alphas: used to store prior mean for each time step
-    :param Lambdas: used to store prior covaraince for each time step
-    :param R: hyperplanes
-    :param depth: maximum depth of tree
-    :return: sampled continuous latent states stored in X
-    '''
-    iden = np.eye(D_in)
-
-    # Pre-compute the inverse of the noise covariance for sampling backwards
-    Qinvs = np.zeros((D_in, D_in, Qs[0, 0, :].size))
-    for k in range(Qs[0, 0, :].size):
-        temp = np.linalg.inv(np.linalg.cholesky(Qs[:, :, k]))
-        Qinvs[:, :, k] = temp.T @ temp
-
-    "Filter forward"
-    for idx in range(len(X)):
-        for t in range(X[idx][0, :].size - 1):
-
-            if depth == 1:
-                alpha = X[idx][:, t] + 0  # If tree is of depth one then just run kalman filter
-                Lambda = P[:, :, t] + 0
-            else:
-                # Multiply product of PG augmented potentials and the last posterior
-                J = 0
-                temp_mu = 0
-                for d in range(depth - 1):
-                    loc = paths[idx][d, t]  # What node did you stop at
-                    fin = paths[idx][d + 1, t]  # Where did you go from current node
-                    if np.isnan(fin) != True:
-                        k = 0.5 * (fin % 2 == 1) - 0.5 * (
-                                fin % 2 == 0)  # Did you go left (ODD) or right (EVEN) from current node in tree
-                        tempR = np.expand_dims(R[d][:-1, int(loc - 1)], axis=1)
-                        J += omega[idx][d, t] * np.matmul(tempR, tempR.T)
-                        temp_mu += tempR.T * (k - omega[idx][d, t] * R[d][-1, int(loc - 1)])
-
-                "Take cholesky decomposition and then invert that"
-                Pinv = np.linalg.inv(P[:, :, t])
-                Lambda = np.linalg.inv(Pinv + J)
-                alpha = Lambda @ (Pinv @ X[idx][:, t][:, na] + temp_mu.T)
-
-            # Store alpha and Lambda for later use
-            alphas[:, t] = alpha.flatten() + 0
-            Lambdas[:, :, t] = Lambda + 0
-            # Prediction
-            Q = Qs[:, :, int(Z[idx][t])] + 0
-            x_prior = (As[:, :-D_bias, int(Z[idx][t])] @ alpha + \
-                       As[:, -D_bias:, int(Z[idx][t])] @ U[idx][:, t][:, na]).flatten()
-
-            P_prior = np.matmul(np.matmul(As[:, :-D_bias, int(Z[idx][t])], Lambda),
-                                As[:, :-D_bias, int(Z[idx][t])].T) + Q
-            if bern:  # If observations are bernoulli
-                kt = Y[idx][:, t] - 0.5
-                S = np.diag(1 / omegay[idx][:, t])
-
-            # Compute Kalman gain
-            K = np.matmul(P_prior, np.linalg.solve(np.matmul(np.matmul(C[:, :-1], P_prior),
-                                                             C[:, :-1].T) + S, C[:, :-1]).T)
-
-            # Correction of estimate
-            if bern:
-                X[idx][:, t + 1] = x_prior + np.matmul(K,
-                                                       kt / omegay[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:,
-                                                                                                                -1])
-
-            else:
-                X[idx][:, t + 1] = x_prior + np.matmul(K, (Y[idx][:, t] - np.matmul(C[:, :-1], x_prior) - C[:, -1]))
-            P_temp = np.matmul((iden - np.matmul(K, C[:, :-1])), P_prior)
-
-            P[:, :, t + 1] = np.array((P_temp + P_temp.T) / 2) + 1e-8 * iden  # Numerical stability
-
-        """
-        Sample backwards
-        """
-        X[idx][:, -1] = X[idx][:, -1] + (
-                np.linalg.cholesky(P[:, :, X[idx][0, :].size - 1]) @ npr.normal(size=D_in)[:, na]).ravel()
-
-        for t in range(X[idx][0, :].size - 2, -1, -1):
-            # Load in alpha and lambda
-            alpha = alphas[:, t]
-            Lambda = Lambdas[:, :, t]
-
-            A_tot = As[:, :-D_bias, int(Z[idx][t])]
-            B_tot = As[:, -D_bias:, int(Z[idx][t])]
-            Qinv = Qinvs[:, :, int(Z[idx][t])]
-
-            Pn = Lambda - Lambda @ A_tot.T @ np.linalg.solve(Q + A_tot @ Lambda @ A_tot.T, A_tot) @ Lambda
-            mu_n = Pn @ (np.linalg.solve(Lambda, alpha)[:, na] + A_tot.T @
-                         Qinv @ (X[idx][:, t + 1][:, na] - B_tot @ U[idx][:, t][:, na]))
-
-            # To ensure PSD of matrix
-            Pn = 0.5 * (Pn + Pn.T) + 1e-8 * iden
-
-            # Sample
-            X[idx][:, t] = (mu_n + np.linalg.cholesky(Pn) @ npr.normal(size=D_in)[:, na]).ravel()
-
-    return X
-
