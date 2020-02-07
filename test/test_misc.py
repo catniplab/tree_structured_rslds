@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.random as npr
-import conditionals as samp
-import utils
+import trslds.conditionals as samp
+import trslds.utils as utils
 from tqdm import tqdm
 # In[1]:
 dim = 2

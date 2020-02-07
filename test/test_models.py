@@ -1,12 +1,12 @@
 import numpy as np
 import numpy.random as npr
 from tqdm import tqdm
-from models import TroSLDS
+from trslds.models import TroSLDS
 from numpy import newaxis as na
-import utils
+import trslds.utils as utils
 import matplotlib.pyplot as plt
-import initialize as init
-import plotting
+import trslds.initialize as init
+import trslds.plotting as plotting
 import seaborn as sns
 color_names = ["windows blue", "leaf green","red", "orange"]
 colors_leaf = sns.xkcd_palette(color_names)
