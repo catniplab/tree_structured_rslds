@@ -220,7 +220,7 @@ class TroSLDS:
         if self.bern:  # If outputs are spikes
             self._sample_pg()  # sample polya-gamma associated with tree
             self._sample_spike_pg()  # sample polya-gamma associated with spikes
-            temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.parallel_pg_kalman)(self.D_in, self.D_bias, self.x[n],
+            temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.pg_kalman)(self.D_in, self.D_bias, self.x[n],
                                                                              self.u[n], self.P, self.Aleaf, self.Q,
                                                                              self.C, 0, self.y[n], self.path[n],
                                                                              self.z[n], self.omega[n], self.alphas,
@@ -239,7 +239,7 @@ class TroSLDS:
             # self.x = conditionals.pg_kalman_batch(self.D_in, self.D_bias, self.x, self.u, self.covs, self.Aleaf, self.Q, self.C,
             #                                 self.S, self.y, self.path, self.z, self.omega, self.alphas, self.covs,
             #                                 self.R, self.depth)
-            temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.parallel_pg_kalman)(self.D_in, self.D_bias, self.x[n],
+            temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.pg_kalman)(self.D_in, self.D_bias, self.x[n],
                                                                                     self.u[n], self.P, self.Aleaf,
                                                                                     self.Q, self.C, self.S, self.y[n],
                                                                                     self.path[n], self.z[n],
