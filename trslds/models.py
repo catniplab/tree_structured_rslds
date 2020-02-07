@@ -7,8 +7,8 @@ import scipy
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from os import cpu_count
-
-n_cpu = int(cpu_count() / 2)
+import copy
+n_cpu = int(cpu_count() / 4)
 #To Do List:
 #1)Learn prior covariances
 #2)Allow for missing data
@@ -155,7 +155,7 @@ class TroSLDS:
     def _sample_emission(self):
         if self.bern:
             self.C = conditionals.emission_parameters_spike_train(self.y, self.x, self.spike_omega, self.mask,
-                                                                  self.My[0, :], self.Vy, self.normalize)
+                                                                  self.My[0, :], self.Vy, self.normalize, N=self.N)
         else:
             self.C, self.S = conditionals.emission_parameters(self.y, self.x, self.mask, self.nuy, self.lambday,
                                                               self.My, self.Vy, self.normalize)
@@ -207,7 +207,7 @@ class TroSLDS:
         self.omega = conditionals.pg_tree_posterior(self.x, self.omega, self.R, self.path, self.depth)
 
     def _sample_spike_pg(self):
-        self.spike_omega = conditionals.pg_spike_train(self.x, self.C, self.spike_omega, self.D_out)
+        self.spike_omega = conditionals.pg_spike_train(self.x, self.C, self.spike_omega, self.D_out, N=self.N)
 
 # In[8]:
     def _sample_continuous_latent(self):
@@ -215,32 +215,40 @@ class TroSLDS:
             max_len = max([self.x[idx][0, :].size for idx in range(len(self.x))])
             self.alphas = np.zeros((self.D_in, max_len))
             self.covs = np.repeat(self.P0[:, :, na], max_len, axis=2)
+            self.P = np.repeat(self.P0[:, :, na], self.alphas[0, :].size, axis=2)
 
-        # P = np.repeat(self.P0[:, :, na], self.alphas[0, :].size, axis=2)
         if self.bern:  # If outputs are spikes
             self._sample_pg()  # sample polya-gamma associated with tree
             self._sample_spike_pg()  # sample polya-gamma associated with spikes
-
             temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.parallel_pg_kalman)(self.D_in, self.D_bias, self.x[n],
-                                                                             self.u[n], self.covs, self.Aleaf, self.Q,
+                                                                             self.u[n], self.P, self.Aleaf, self.Q,
                                                                              self.C, 0, self.y[n], self.path[n],
                                                                              self.z[n], self.omega[n], self.alphas,
                                                                              self.covs, self.R, self.depth,
                                                                              omegay=self.spike_omega[n],
-                                                                             bern=self.bern, N=self.N, identity=n)
+                                                                             bern=self.bern, N=self.N, marker=n)
                                            for n in range(len(self.x)))
-            for n in range(len(self.x)):
-                temp_x, temp_idx = temps[n]
-                self.x[temp_idx] = temp_x
-            # self.x = conditionals.pg_kalman(self.D_in, self.D_bias, self.x, self.u, self.covs, self.Aleaf, self.Q,
+            for n in range(len(temps)):
+                self.x[temps[n][1]] = temps[n][0]
+            # self.x = conditionals.pg_kalman_batch(self.D_in, self.D_bias, self.x, self.u, self.covs, self.Aleaf, self.Q,
             #                                       self.C, 0, self.y, self.path, self.z, self.omega,
             #                                       self.alphas, self.covs, self.R, self.depth, self.spike_omega,
             #                                       self.bern, N=self.N)
         else:  # If outputs are gaussian
             self._sample_pg()
-            self.x = conditionals.pg_kalman(self.D_in, self.D_bias, self.x, self.u, self.covs, self.Aleaf, self.Q, self.C,
-                                            self.S, self.y, self.path, self.z, self.omega, self.alphas, self.covs,
-                                            self.R, self.depth)
+            # self.x = conditionals.pg_kalman_batch(self.D_in, self.D_bias, self.x, self.u, self.covs, self.Aleaf, self.Q, self.C,
+            #                                 self.S, self.y, self.path, self.z, self.omega, self.alphas, self.covs,
+            #                                 self.R, self.depth)
+            temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.parallel_pg_kalman)(self.D_in, self.D_bias, self.x[n],
+                                                                                    self.u[n], self.P, self.Aleaf,
+                                                                                    self.Q, self.C, self.S, self.y[n],
+                                                                                    self.path[n], self.z[n],
+                                                                                    self.omega[n], self.alphas,
+                                                                                    self.covs, self.R, self.depth,
+                                                                                    marker=n) for n in range(len(self.x)))
+            for n in range(len(temps)):
+                self.x[temps[n][1]] = temps[n][0]
+
 
 # In[]
     def resample(self, no_samples):
