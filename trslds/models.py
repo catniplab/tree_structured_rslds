@@ -8,7 +8,7 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 from os import cpu_count
 import copy
-n_cpu = int(cpu_count() / 4)
+n_cpu = int(cpu_count() / 2)
 #To Do List:
 #1)Learn prior covariances
 #2)Allow for missing data
