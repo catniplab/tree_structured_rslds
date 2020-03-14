@@ -424,6 +424,7 @@ def projection(xreal, xinferr):
     transform = np.linalg.lstsq(Xrot, Xreals)[0].T
     return transform
 
+
 # In[]:
 def generate_trajectory(A, Q, R, starting_pt, depth, leaf_path, K, T, D_in, noise=True, u=None, D_bias=None):
     if u is D_bias is None:
@@ -455,6 +456,7 @@ def generate_trajectory(A, Q, R, starting_pt, depth, leaf_path, K, T, D_in, nois
     z[-1] = np.where(choice[0, :] == 1)[0][0]
     return x, z
 
+
 # In[]:
 def MAP_dynamics(x, u, z, Ainit, Qinit, nux, lambdax, Mx, Vx, scale, leaf_nodes, K, depth, no_samples):
     A_est = []
@@ -469,21 +471,22 @@ def MAP_dynamics(x, u, z, Ainit, Qinit, nux, lambdax, Mx, Vx, scale, leaf_nodes,
             A_est.append(copy.deepcopy(At))
             Q_est.append(copy.deepcopy(Qt))
     
-    #Take average of samples
+    # Take average of samples
     Z = len(A_est)
-    #Take sample mean as estimate
+    # Take sample mean as estimate
     for d in range(depth):
         for node in range(2**d):
-            At[d][:,:,node] = A_est[0][d][:,:,node]/Z
+            At[d][:, :, node] = A_est[0][d][:, :, node] / Z
     Qt = Q_est[0]/Z
     for sample in tqdm(range(1, len(A_est))):
         for k in range(K):
-            Qt[:,:,k] += Q_est[sample][:,:,k]/Z
-        #Take sample mean as estimate
+            Qt[:, :, k] += Q_est[sample][:, :, k]/Z
+        # Take sample mean as estimate
         for d in range(depth):
             for node in range(2**d):
-                At[d][:,:,node] += A_est[sample][d][:,:,node]/Z
+                At[d][:, :, node] += A_est[sample][d][:, :, node] / Z
     return At, Qt
+
 
 # In[]:
 def gaussian_kernel_smoother(y, sigma, window):
