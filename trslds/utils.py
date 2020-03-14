@@ -12,25 +12,24 @@ from scipy.ndimage import filters
 from scipy.signal import gaussian
 from numba import njit, jit
 
+
 # In[1]:
 def compute_ss_mniw(X, Y, nu, Lambda, M, V ):
-    '''
+    """
     Compute sufficient statistics for MNIW posterior of emission parameter
-    :param observations: list of numpy array where array are the observations of the underlying time series
-    :param states: list of numpy arrays where each array are the continuous latent states
-    :param mask: boolean mask used to remove missing data. A list of mask for each time series
-    :param nu: prior degree of freedoms
-    :param Lambda: prior on noise covariance
-    :param M: prior mean of emission
-    :param V: prior row covariance
-    :return: posterior parameters (M, V, IW, nu)
-    '''
-    df_posterior = nu + X[:, 0].size #Update degrees of freedom for IW posterior
+    :param X: Inputs for regression
+    :param Y:  Target data
+    :param nu: prior degrees of freedom
+    :param Lambda: Prior psd matrix for inverse wishart
+    :param M:  Prior mean for matrix normal
+    :param V: Prior column covariance matrix
+    :return: Parameters of posterior (M, V, IW, nu)
+    """
+    df_posterior = nu + X[:, 0].size  # Update degrees of freedom for IW posterior
 
-    Vinv = np.linalg.inv(V) #Precompute to save time
+    Vinv = np.linalg.inv(V)  # Precompute to save time
     Ln = X.T @ X + Vinv
     Bn = np.linalg.solve(Ln, X.T @ Y + Vinv @ M.T)
-#    IW_matrix = Lambda + (Y - X @ Bn).T @ (Y - X @ Bn) + (Bn - M.T).T @  np.linalg.solve(V, Bn - M.T)
     IW_matrix = Lambda + (Y - X @ Bn).T @ (Y - X @ Bn) + (Bn - M.T).T @  Vinv @ (Bn - M.T)
     # To ensure PSD
     IW_matrix = (IW_matrix + IW_matrix.T) / 2
