@@ -120,6 +120,15 @@ def sample_hyperplanes(states, omega, paths, depth, prior_mu, prior_tau, possibl
 
 # In[6]:
 def sample_internal_dynamics(A, scale, Mx, Vx, depth):
+    """
+    Sample from conditional posterior of the internal dynamics
+    :param A: Used to store samples
+    :param scale: Scale parameter that controls the closeness between parent and child
+    :param Mx: Prior Mean
+    :param Vx: Prior Row Covariance
+    :param depth: maximum depth of tree
+    :return: A
+    """
     # Sample from bottoms up
     for level in range(depth - 2, -1, -1):
         for node in range(2 ** level):
@@ -139,18 +148,34 @@ def sample_internal_dynamics(A, scale, Mx, Vx, depth):
                                                                    scale ** (level + 1) * Vx)
     return A
 
+
 # In[7]:
 def sample_leaf_dynamics(states, inputs, discrete_states, A, Q, nu, lambdax, Mx, Vx, scale, leaf_nodes):
+    """
+    Sample from posterior of the dynamics at the leaf nodes
+    :param states: continuous latent states
+    :param inputs: inputs to the model
+    :param discrete_states: discrete latent states
+    :param A: Used to store samples
+    :param Q: Used to store samples for the noise covariance matrix
+    :param nu: prior df for IW
+    :param lambdax: prior PSD matrix for IW
+    :param Mx:  prior mean for matrix normal
+    :param Vx: prior column covraince matrix
+    :param scale: parameter that controls the closeness between parents and children
+    :param leaf_nodes: location of leaf nodes in the tree
+    :return: A, Q
+    """
     X = np.hstack([states[idx][:, :-1] for idx in range(len(states))])  # x_{0:T-1}
     U = np.hstack([inputs[idx][:, :-1] for idx in range(len(inputs))])  # inputs u_{0:T-1}
     X = np.vstack((X, U))
 
     Y = np.hstack([states[idx][:, 1:] for idx in range(len(states))])  # x_{1:T}
 
-    Z = np.hstack([discrete_states[idx][:-1] for idx in range(len(states))]) #discrete states
+    Z = np.hstack([discrete_states[idx][:-1] for idx in range(len(states))])  # discrete states
     
     for (d, node, k) in leaf_nodes:
-        indices = Z == k #create a boolean mask
+        indices = Z == k  # create a boolean mask
 
         effective_X = X[:, indices]
         effective_Y = Y[:, indices]
@@ -160,9 +185,8 @@ def sample_leaf_dynamics(states, inputs, discrete_states, A, Q, nu, lambdax, Mx,
             Mprior = A[d-1][:, :, int(np.floor(node/2))]
 
         draw_prior = effective_X.size == 0  # If no data points allocated, draw from prior.
-        A[d][:, :, int(node)], Q[:, :, int(k)] = conditionals.leaf_dynamics(effective_Y, effective_X, nu,
-                                                                            lambdax, Mprior, scale ** d * Vx, draw_prior)
-
+        A[d][:, :, int(node)], Q[:, :, int(k)] = conditionals.leaf_dynamics(effective_Y, effective_X, nu, lambdax,
+                                                                            Mprior, scale ** d * Vx, draw_prior)
     return A, Q
 
 
@@ -181,6 +205,11 @@ def sigmoid(x):
 
 # In[]
 def sigmoid_vectorized(x):
+    """
+    Vectorized numerically stable sigmoid function
+    :param x: input values
+    :return: z
+    """
     z = np.zeros(x.size)
     z[x >= 0] = 1 / (1 + np.exp(-x[x >= 0]))
     z[x < 0] = np.exp(x[x < 0]) / (1 + np.exp(x[x < 0]))
@@ -188,7 +217,6 @@ def sigmoid_vectorized(x):
 
 
 # In[9]:
-# @njit
 def log_mvn(x, mu, tau, logdet):
     """
     Easy way to compute log multivariate normal with same covariance but different means
@@ -203,6 +231,15 @@ def log_mvn(x, mu, tau, logdet):
 
 # In[10]:
 def compute_leaf_log_prob(R, x, K, depth, leaf_paths):
+    """
+    Compute the pmf of discrete latent states according to the tree
+    :param R: list of hyperplanes where R[n] are the hyperplanes for the nth level in the tree
+    :param x: continuous latent state
+    :param K: Number of leaf nodes
+    :param depth: depth of the tree
+    :param leaf_paths: paths that lead to leaf nodes
+    :return: pmf over all possible K leaf nodes
+    """
     # Generate discrete latent states
     log_prob = np.zeros(K)
     for k in range(K):
@@ -210,7 +247,7 @@ def compute_leaf_log_prob(R, x, K, depth, leaf_paths):
         for level in range(depth - 1):
             node = int(leaf_paths[level, k])
             child = leaf_paths[level + 1, k]
-            if np.isnan(child) == False:
+            if ~np.isnan(child):
                 v = np.matmul(R[level][:-1, node - 1], x) + R[level][-1, node - 1]
                 if int(child) % 2 == 1:  # If odd then you went left
                     log_prob[k] += np.log(sigmoid(v))
@@ -222,6 +259,15 @@ def compute_leaf_log_prob(R, x, K, depth, leaf_paths):
 # In[10]:
 # @njit
 def compute_leaf_log_prob_vectorized(R, x, K, depth, leaf_paths):
+    """
+    Vectorized version where the pmf over leaf nodes are computed over multiple query points
+    :param R: list of hyperplanes where R[n] are the hyperplanes for the nth level in the tree
+    :param x: A dx by N array where each column is a query point
+    :param K: Number of leaf nodes
+    :param depth: depth of the tree
+    :param leaf_paths: paths that lead to leaf nodes
+    :return: A K by N matrix where each column is the corresponding pmf over the leaf nodes for nth query
+    """
     # Generate discrete latent states
     log_prob = np.zeros((K, x[0, :].size))
     for k in range(K):
@@ -237,8 +283,14 @@ def compute_leaf_log_prob_vectorized(R, x, K, depth, leaf_paths):
                     log_prob[k, :] = log_prob[k, :] + np.log(sigmoid_vectorized(-v))
     return log_prob
 
+
 # In[11]:
 def create_balanced_binary_tree(K):
+    """
+    Create a balanced binary tree for a specified number of leaf nodes
+    :param K: number of leaf nodes
+    :return: depth of the tree, paths for the leaf nodes, all possible paths, location of leaf nodes
+    """
     depth = int(np.ceil(np.log2(K)) + 1)  # Find the maximum depth of the tree
     # Assume a perfect binary tree
     K_perf = 2 ** (depth - 1)
@@ -281,6 +333,7 @@ def create_balanced_binary_tree(K):
                     leaf_nodes.append((int(d), int(leaf_path[d, k] - 1), int(k)))
 
     return depth, leaf_path, possible_paths, leaf_nodes
+
 
 # In[12]:
 def optimize_tree(y, x, LDS, nu, ancestor_weights, K, HP, path_LDS, max_epoch, batch_size, LR, temper):
