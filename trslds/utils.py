@@ -257,7 +257,6 @@ def compute_leaf_log_prob(R, x, K, depth, leaf_paths):
 
 
 # In[10]:
-# @njit
 def compute_leaf_log_prob_vectorized(R, x, K, depth, leaf_paths):
     """
     Vectorized version where the pmf over leaf nodes are computed over multiple query points
