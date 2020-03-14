@@ -108,4 +108,4 @@ def initialize(Y, dx, K, max_epochs, batch_size, lr, X=None, u=None, random=Fals
     "Initializing paths taken"
     Z, Path = fit.initialize_discrete(X, R, depth, K, leaf_path, random=random)
 
-    return A, C, R, X, Z, Path, possible_paths, leaf_path, leaf_nodes, losses
+    return A, C, R, X, Z, Path, possible_paths, leaf_path, leaf_nodes
