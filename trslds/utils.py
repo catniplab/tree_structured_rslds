@@ -334,77 +334,97 @@ def create_balanced_binary_tree(K):
     return depth, leaf_path, possible_paths, leaf_nodes
 
 
+# In[]
+def create_batches(batch_size, N):
+    """
+    Will create an iterable that will partition data into random batches for SGD
+    :param batch_size: number of elements in a batch
+    :param N: number of total samples
+    :return: a list of indices
+    """
+    if batch_size == N:
+        idx = [np.arange(N)]
+    else:
+        indices = npr.choice(N, N).astype('int')
+        numBatches = np.ceil(N / batch_size).astype('int')
+        idx = [indices[i * batch_size: (i + 1) * batch_size] for i in range(numBatches)]
+    return idx
+
+
 # In[12]:
-def optimize_tree(y, x, LDS, nu, ancestor_weights, K, HP, path_LDS, max_epoch, batch_size, LR, temper):
-    # dim=dimension of latent space
-    # y = output data
-    # x = input data
-    # LDS= linear dynamics of nodes in current depth of the tree
-    # nu= hyperplanes
-    # ancestor_weights= prpobability of previous paths
-    # K=number of nodes at current depth of the tree
-    # HP= number of hypeplanes
-    # path_LDS= weighted sum of previous LDS
-    # max_epoch = maximum number of epochs
-    # batch = size of batch
-    # LR = learning rate
-    # temper = parameter in sigmoid function used to make decision boundaries sharper
+def optimize_tree(y, x, LDS, nu, ancestor_weights, K, num_hp, epochs, batch_size, LR, temper):
+    """
 
+    :param y:
+    :param x:
+    :param LDS:
+    :param nu:
+    :param ancestor_weights:
+    :param K:
+    :param HP:
+    :param path_LDS:
+    :param max_epoch:
+    :param batch_size:
+    :param LR:
+    :param temper:
+    :return:
+    """
     nT = int(x[:, 0].size)  # Number of trajectories
-
-    N = int(np.ceil(nT / batch_size))
-    batch_size = int(batch_size)
     rows, cols = x.T.shape
-
     input_data = torch.from_numpy(x.T).double()
     output_data = torch.from_numpy(y.T).double()
-    LD = Variable(torch.from_numpy(LDS), requires_grad=True).double()
-    hp = Variable(torch.from_numpy(nu), requires_grad=True).double()
+    lds = Variable(torch.from_numpy(LDS), requires_grad=True).double()
+    nu = Variable(torch.from_numpy(nu), requires_grad=True).double()
     prev_weights = torch.from_numpy(ancestor_weights).double()
-    p_LDS = Variable(torch.from_numpy(path_LDS)).double()
 
     # Construct optimizer object
     #    optimizer = optim.SGD( [LD, hp], lr = LR,  momentum=0.95, dampening = 0, nesterov = True )
-    optimizer = optim.Adam([LD, hp], lr=LR)
+    optimizer = optim.Adam([lds, nu], lr=LR)
     # Perform optimization
-    for epoch in range(max_epoch):
-        for n in range(N):
+    for epoch in tqdm(range(epochs)):
+        "Create mini batches"
+        batch_idx = create_batches(batch_size, nT)
+        for idx in batch_idx:
             optimizer.zero_grad()
-
-            if n == N - 1:
-                X = Variable(input_data[:, n * batch_size:])
-                Y = Variable(output_data[:, n * batch_size:])
-                anc_weights = Variable(prev_weights[:, n * batch_size:])
-                weights_local = Variable(torch.from_numpy(np.zeros((K, len(input_data[0, n * batch_size:])))))
-                y_local = Variable(torch.from_numpy(np.zeros((rows - 1, len(input_data[0, n * batch_size:]), K))))
-
-            else:
-                X = Variable(input_data[:, n * batch_size:(n + 1) * batch_size])
-                Y = Variable(output_data[:, n * batch_size:(n + 1) * batch_size])
-                anc_weights = Variable(prev_weights[:, n * batch_size:(n + 1) * batch_size])
-                weights_local = Variable(torch.from_numpy(np.zeros((K, batch_size))))
-                y_local = Variable(torch.from_numpy(np.zeros((rows - 1, batch_size, K))))
+            X = input_data[:, idx]
+            Y = output_data[:, idx]
+            anc_weights = prev_weights[:, idx]
+            leaf_weights = torch.zeros(K, idx.size)
+            y_leafs = torch.zeros(rows - 1, idx.size, K)
+            # if n == num_batches - 1:
+            #     X = Variable(input_data[:, n * batch_size:])
+            #     Y = Variable(output_data[:, n * batch_size:])
+            #     anc_weights = Variable(prev_weights[:, n * batch_size:])
+            #     weights_local = Variable(torch.from_numpy(np.zeros((K, len(input_data[0, n * batch_size:])))))
+            #     y_local = Variable(torch.from_numpy(np.zeros((rows - 1, len(input_data[0, n * batch_size:]), K))))
+            #
+            # else:
+            #     X = Variable(input_data[:, n * batch_size:(n + 1) * batch_size])
+            #     Y = Variable(output_data[:, n * batch_size:(n + 1) * batch_size])
+            #     anc_weights = Variable(prev_weights[:, n * batch_size:(n + 1) * batch_size])
+            #     weights_local = Variable(torch.from_numpy(np.zeros((K, batch_size))))
+            #     y_local = Variable(torch.from_numpy(np.zeros((rows - 1, batch_size, K))))
 
             # Compute weight of each path
             counter = 0
             for h in range(0, HP):
-                weights_local[counter, :] = torch.mul(anc_weights[counter, :],
+                leaf_weights[counter, :] = torch.mul(anc_weights[counter, :],
                                                       torch.sigmoid(temper * torch.matmul(X.transpose(0, 1), hp[:, h])))
-                weights_local[counter + 1, :] = torch.mul(anc_weights[counter + 1, :], torch.sigmoid(
+                leaf_weights[counter + 1, :] = torch.mul(anc_weights[counter + 1, :], torch.sigmoid(
                     -temper * torch.matmul(X.transpose(0, 1), hp[:, h])))
                 counter += 2
 
             # Compute weighted sum of LDS
             for k in range(0, K):
-                y_local[:, :, k] = torch.mul(weights_local[k, :], torch.matmul(p_LDS[:, :, k] + LD[:, :, k], X))
+                y_leafs[:, :, k] = torch.mul(leaf_weights[k, :], torch.matmul(lds[:, :, k], X))
 
-            y_pred = torch.sum(y_local, 2)
+            y_pred = torch.sum(y_leafs, 2)
 
             # Compute difference
-            z = Y - y_pred
+            resid = Y - y_pred
 
             # Compute MSE
-            loss = torch.matmul(z, z.transpose(0, 1)).trace() / len(X[0, :])
+            loss = 0.5 * torch.matmul(resid, resid.transpose(0, 1)).trace() / idx.size
 
             # Perform backprop
             loss.backward()
@@ -412,7 +432,7 @@ def optimize_tree(y, x, LDS, nu, ancestor_weights, K, HP, path_LDS, max_epoch, b
             # Update parameters
             optimizer.step()
 
-    return LD, hp
+    return lds, nu, resid.detach().numpy(), loss.item()
 
 
 # In[13]:
