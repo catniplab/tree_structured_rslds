@@ -4,9 +4,10 @@ from sklearn.decomposition import PCA
 from . import utils
 from numpy import newaxis as na
 import numpy.random as npr
+import matplotlib.pyplot as plt
 
 
-def initialize(Y, dx, K, max_epochs, batch_size, lr, X=None, u=None, random=False):
+def initialize(Y, dx, K, max_epochs, batch_size, lr, X=None, u=None, random=False, plot=False):
     dy = Y[0][:, 0].size  # Find dimension of observed data
 
     if u is None:
@@ -52,12 +53,18 @@ def initialize(Y, dx, K, max_epochs, batch_size, lr, X=None, u=None, random=Fals
     LDS_init, nu_init, losses = fit.top_to_bottom(X, depth, max_epochs, batch_size, lr, u=u)
     print("End of Initialization")
 
+    if plot:
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111)
+        ax.plot(losses)
+        ax.set_xlabel('Epochs')
+        ax.set_ylabel('Loss')
+        fig.show()
+
     "Append starting points to time series"
     for idx in range(len(Y)):
         start_pt = X[idx][:, 0] + 0.1 * npr.randn(dx)
         X[idx] = np.hstack((start_pt[:, na], X[idx]))
-        # X[idx] = np.hstack((starting_pts[:, idx][:, na], X[idx])) + 0*npr.multivariate_normal(np.zeros(D_in), 0.1*np.eye(D_in),
-        #  size = X[idx][0, :].size + 1).T
 
     "Initialize the dynamics of the tree"
     # Dynamic Parameters
