@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import trslds.initialize as init
 import trslds.plotting as plotting
 import seaborn as sns
-color_names = ["windows blue", "leaf green","red", "orange"]
+color_names = ["windows blue", "leaf green", "red", "orange"]
 colors_leaf = sns.xkcd_palette(color_names)
 npr.seed(0)
 # In[1]:
@@ -18,13 +18,13 @@ D_out = 2
 K = 4
 depth, leaf_path, possible_paths, leaf_nodes = utils.create_balanced_binary_tree(K)
 
-#Define emission parameters
+# Define emission parameters
 C = np.zeros((D_out, D_in + 1))
 C[:, :-1] = np.eye(D_out)
 C[0, 1] = 2
 S = .001 * np.eye(D_out)
 
-#Create dynamics
+# Create dynamics
 A = []
 A.append(np.zeros((D_in, D_in + 1, 1)))
 A.append(np.zeros((D_in, D_in + 1, 2)))
@@ -47,9 +47,9 @@ At[:, -1, 3] = np.array([-.05, 0])
 
 A.append(At)
 
-Q = np.repeat(.001*np.eye(D_in)[:, :, na], K, axis=2) #Noise covariance
+Q = np.repeat(.001*np.eye(D_in)[:, :, na], K, axis=2)  # Noise covariance
 
-#Create hyperplanes
+# Create hyperplanes
 R_par = np.zeros((D_in + 1, 1))
 R_par[0, 0] = 100
 R_par[1, 0] = 100
@@ -57,18 +57,18 @@ r_par = np.array([0.0])
 
 R = []
 R.append(R_par)
-R_temp = np.zeros((D_in + 1,2))
-R_temp[:-1, 0] = np.array([-100, 100]) #Left hyperplane
-R_temp[:-1, 1] = np.array([-100, 100]) #Right hyperplane
+R_temp = np.zeros((D_in + 1, 2))
+R_temp[:-1, 0] = np.array([-100, 100])  # Left hyperplane
+R_temp[:-1, 1] = np.array([-100, 100])  # Right hyperplane
 R.append(R_temp)
 
 kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Q, 'emission': C, 'emission_noise': S,
           'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path, 'leaf_nodes': leaf_nodes}
 
-true_model = TroSLDS(**kwargs) #Create model
+true_model = TroSLDS(**kwargs)  # Create model
 
 # In[1]:
-#Generate data from model
+# Generate data from model
 no_realizations = 50
 Tmin = 400
 Tmax = 600
@@ -108,28 +108,29 @@ Sstart = np.eye(D_out)
 
 # In[]:
 npr.seed(10)
-kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Qstart, 'emission': C, 'emission_noise': Sstart,
-          'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path, 'leaf_nodes': leaf_nodes, 'scale':0.5}
+kwargs = {'D_in': D_in, 'D_out': D_out, 'K': K, 'dynamics': A, 'dynamics_noise': Qstart, 'emission': C,
+          'emission_noise': Sstart, 'hyper_planes': R, 'possible_paths': possible_paths, 'leaf_path': leaf_path,
+          'leaf_nodes': leaf_nodes, 'scale': 0.5}
 trslds = TroSLDS(**kwargs)
 "Perform Gibbs sampling to learn the parameters"
 for idx in range(no_realizations):
     trslds._add_data(X[idx], Yreal[idx], Z[idx], Path[idx])
 
 no_samples = 150
-trslds._initialize_polya_gamma() # Initialze polya-gamma rvs
+trslds._initialize_polya_gamma()  # Initialize polya-gamma rvs
 for m in tqdm(range(no_samples)):
-    trslds._sample_emission() #sample emission parameters
-    trslds._sample_hyperplanes() #sample hyperplanes
-    trslds._sample_dynamics() #Sample dynamics of tree
-    trslds._sample_discrete_latent() #Sample discrete latent states
-#    trslds._sample_pg()
-    trslds._sample_continuous_latent() #Sample continuous latent states
+    trslds._sample_emission()  # sample emission parameters
+    trslds._sample_hyperplanes()  # sample hyperplanes
+    trslds._sample_dynamics()  # sample dynamics of tree
+    trslds._sample_discrete_latent()  # sample discrete latent states
+    # trslds._sample_pg()
+    trslds._sample_continuous_latent()  # sample continuous latent states
 
 
 # In[]:
 "Plot inferred latent states"
 Xinferr = trslds.x
-#Project onto real space
+# Project onto real space
 Xreals = np.hstack(Xreal).T
 Xrot = np.hstack(Xinferr).T
 Xrot = np.hstack((Xrot, np.ones((Xrot[:, 0].size, 1))))
@@ -157,7 +158,8 @@ ymax = 15
 delta = 0.1
 
 
-X, Y, arrows = plotting.rot_vector_field(trslds.Aleaf, trslds.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path, K, transform)
+X, Y, arrows = plotting.rot_vector_field(trslds.Aleaf, trslds.R, xmin, xmax, ymin, ymax, delta, depth, leaf_path,
+                                         K, transform)
 norm = np.sqrt(arrows[:, :, 0] ** 2 + arrows[:, :, 1] ** 2)
 U = arrows[:, :, 0]/norm
 V = arrows[:, :, 1]/norm
@@ -170,10 +172,10 @@ X, Y, color = plotting.rot_contour_plt(trslds.R, xmin, xmax, ymin, ymax, delta, 
 
 for k in range(K):
     start = np.array([1., 1., 1., 0.])
-    end = np.concatenate((colors_leaf[k ], [0.5]))
+    end = np.concatenate((colors_leaf[k], [0.5]))
     cmap = plotting.gradient_cmap([start, end])
-    im1 = ax.imshow(color[:,:,k],
-                    extent=[xmin, xmax, ymin,ymax],
+    im1 = ax.imshow(color[:, :, k],
+                    extent=[xmin, xmax, ymin, ymax],
                     vmin=0, vmax=1, cmap=cmap, origin='lower')
     ax.set_aspect('auto')
 ax.set_xlim([xmin, xmax])
