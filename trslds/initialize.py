@@ -6,40 +6,35 @@ from . import utils
 from numpy import newaxis as na
 import numpy.random as npr
 
-def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None):
-    D_out = Y[0][:, 0].size  # Find dimension of observed data
 
-    if starting_pts is None:
-        starting_pts = 10*np.random.normal(size=(D_in, len(Y)))
+def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None, X=None):
+    dy = Y[0][:, 0].size  # Find dimension of observed data
+
+    # if starting_pts is None:
+    #     starting_pts = 10 * np.random.normal(size=(D_in, len(Y)))
+
     # Create balanced binary tree with K leaves
     depth, leaf_path, possible_paths, leaf_nodes = utils.create_balanced_binary_tree(K)
-
-    "Initialization of emission parameters and continuous latent states"
-    # Perform probabilistic PCA to get an estimate of the continuous latent states and the emission parameters
     tempy = np.hstack(Y).T
-    model = PCA(n_components=D_in, whiten=False)
-    tempx = model.fit_transform(tempy).T
-    C = model.components_.T
-    D = model.mean_[:, None]
+    if X is None:
+        "Initialization of emission parameters and continuous latent states"
+        # Perform probabilistic PCA to get an estimate of the continuous latent states and the emission parameters
+        model = PCA(n_components=D_in, whiten=True)
+        tempx = model.fit_transform(tempy).T
+        C = model.components_.T
+        D = model.mean_[:, None]
+    else:
+        tempx = np.hstack(X).T
+        # z-score latents
+        tempx -= np.mean(tempx, 1)[:, na]
+        tempx /= np.std(tempx, 1)[:, na]
+        x_ols = np.hstack((tempx.T, (np.ones((tempx[0, :].size, 1)))), 1)
+        beta = np.linalg.solve((x_ols.T @ x_ols), x_ols.T @ tempy.T).T
+        C = beta[:, :-1]
+        D = beta[:, -1]
 
-    "Perform rq decomposition of C to remove rotation of states"
-    upper, orthor = linalg.rq(C)
-    rotate = np.eye(D_in)
-
-    "Prevent sign flipping"
-    for j in range(D_in):
-        if np.sign(upper[D_out - D_in + j, j]) < 0:
-            rotate[j, j] = -1
-
-    upper = upper @ rotate
-    orthor = rotate @ orthor
-
-    "Rotate estimated latent states"
-    tempx = orthor @ tempx
-
-    C = upper  # initialize the emission matrix C
     C = np.hstack((C, D))  # Affine term is appended to last column of emission parameter
-
+    
     # Format X correctly
     start = 0
     X = []
