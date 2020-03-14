@@ -1,5 +1,4 @@
 import numpy as np
-from scipy import linalg
 from trslds import fit_greedy_mse as fit
 from sklearn.decomposition import PCA
 from . import utils
@@ -7,11 +6,15 @@ from numpy import newaxis as na
 import numpy.random as npr
 
 
-def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None, X=None):
+def initialize(Y, dx, K, max_epochs, batch_size, lr, X=None, u=None, random=False):
     dy = Y[0][:, 0].size  # Find dimension of observed data
 
-    # if starting_pts is None:
-    #     starting_pts = 10 * np.random.normal(size=(D_in, len(Y)))
+    if u is None:
+        du = 1
+        u = [np.ones((1, Y[idx][0, :].size - 1)) for idx in range(len(Y))]
+    else:
+        du = u[0][:, 0].size
+        u = [u[idx][:, 1:] for idx in range(len(u))]
 
     # Create balanced binary tree with K leaves
     depth, leaf_path, possible_paths, leaf_nodes = utils.create_balanced_binary_tree(K)
@@ -19,7 +22,7 @@ def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None, X=None
     if X is None:
         "Initialization of emission parameters and continuous latent states"
         # Perform probabilistic PCA to get an estimate of the continuous latent states and the emission parameters
-        model = PCA(n_components=D_in, whiten=True)
+        model = PCA(n_components=dx, whiten=True)
         tempx = model.fit_transform(tempy).T
         C = model.components_.T
         D = model.mean_[:, None]
@@ -34,7 +37,7 @@ def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None, X=None
         D = beta[:, -1]
 
     C = np.hstack((C, D))  # Affine term is appended to last column of emission parameter
-    
+
     # Format X correctly
     start = 0
     X = []
@@ -46,13 +49,15 @@ def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None, X=None
     "Initialization of dynamic parameters, hyper-planes, discrete latent states"
     # To initialize this complex model, we first fit a similar version where the goal is to minimize MSE
     print("Initialization")
-    LDS_init, nu_init = fit.initialize_dynamics(X, depth, max_epochs, batch_size, lr)
+    LDS_init, nu_init, losses = fit.top_to_bottom(X, depth, max_epochs, batch_size, lr, u=u)
     print("End of Initialization")
 
     "Append starting points to time series"
     for idx in range(len(Y)):
-        X[idx] = np.hstack((starting_pts[:, idx][:, na], X[idx])) + 0*npr.multivariate_normal(np.zeros(D_in), 0.1*np.eye(D_in),
-         size = X[idx][0, :].size + 1).T
+        start_pt = X[idx][:, 0] + 0.1 * npr.randn(dx)
+        X[idx] = np.hstack((start_pt[:, na], X[idx]))
+        # X[idx] = np.hstack((starting_pts[:, idx][:, na], X[idx])) + 0*npr.multivariate_normal(np.zeros(D_in), 0.1*np.eye(D_in),
+        #  size = X[idx][0, :].size + 1).T
 
     "Initialize the dynamics of the tree"
     # Dynamic Parameters
@@ -65,22 +70,22 @@ def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None, X=None
         """
         Allocate temporary memory for storing parameters
         """
-        A_t = np.zeros((D_in, D_in + 1, 2 ** int(d)))
-        R_t = np.zeros((D_in + 1, 2 ** int(d)))
+        A_t = np.zeros((dx, dx + du, 2 ** int(d)))
+        R_t = np.zeros((dx + 1, 2 ** int(d)))
 
         for node in range(2 ** int(d)):
             """
-            Initalize with values obtained from LS version
+            Initialize with values obtained from LS version
             """
-            if np.isnan(possible_paths[d, node]) != True:
-                A_t[:, :-1, node] = LDS_init[d][:, :-1, node] + np.eye(D_in)
-                A_t[:, -1, node] = LDS_init[d][:, -1, node]
+            if ~np.isnan(possible_paths[d, node]):
+                A_t[:, :-du, node] = LDS_init[d][:, :-du, node]
+                A_t[:, -du:, node] = LDS_init[d][:, -du:, node]
 
                 if d != 0:
-                    A_t[:, :-1, node] += A[d - 1][:, :-1, int(np.floor(node / 2))] - np.eye(D_in)
-                    A_t[:, -1, node] += A[d - 1][:, -1, int(np.floor(node / 2))]
+                    A_t[:, :-du, node] += A[d - 1][:, :-du, int(np.floor(node / 2))]
+                    A_t[:, -du:, node] += A[d - 1][:, -du:, int(np.floor(node / 2))]
             else:
-                A_t[:, :, node] = np.nan * np.ones((D_in, D_in + 1))
+                A_t[:, :, node] = np.nan * np.ones((dx, dx + du))
 
             if d != depth - 1:
                 R_t[:, node] = nu_init[d][:, node]
@@ -93,7 +98,7 @@ def initialize(Y, D_in, K, max_epochs, batch_size, lr, starting_pts=None, X=None
         if d != depth - 1:
             R[d] = R_t
 
-    "Initalizing paths taken"
-    Z, Path = fit.initialize_discrete(X, R, depth, K, leaf_path)
+    "Initializing paths taken"
+    Z, Path = fit.initialize_discrete(X, R, depth, K, leaf_path, random=random)
 
-    return A, C, R, X, Z, Path, possible_paths, leaf_path, leaf_nodes
+    return A, C, R, X, Z, Path, possible_paths, leaf_path, leaf_nodes, losses

@@ -4,28 +4,29 @@ from . import utils
 
 
 def top_to_bottom(data, max_depth, max_epoch, batch_size, lr, u=None):
-    if u is None:
-        du = 1
-        u = np.ones((1, data[0, :-1].size))
-    else:
-        du = u[0, :].size
-
     dx = data[0][:, 0].size  # Dimension of latent space
-
     hier_LDS = []  # Create list that will store Linear Dynamics per level in the hierarchy
     hier_nu = []
     losses = []
+
+    # In[]
+    x_ols = np.hstack([data[idx][:, :-1] for idx in range(len(data))]).T
+    y_ols = np.hstack([data[idx][:, 1:] for idx in range(len(data))]).T
+
+    if u is None:
+        du = 1
+        u_ols = np.ones((1, x_ols[:, 0].size))
+    else:
+        u_ols = np.hstack(u)
+        du = u_ols[:, 0].size
+    x_ols = np.hstack((x_ols, u_ols.T))
 # In[]:
     "For the root node, we can easily find the LDS that minimizes MSE using the OLS estimator"
-    x_ols = np.hstack([data[idx][:, :-1] for idx in range(len(data))]).T
-    y_ols = np.hstack([data[idx][:, 1:] for idx in range(len(data))]).T - x_ols
-    x_ols = np.hstack((x_ols, u.T))
-
-    # Get the OLS estimate
-    beta = np.linalg.solve((x_ols.T @ x_ols), x_ols.T @ y_ols).T
-    hier_LDS.append(np.expand_dims(np.array(beta), axis=2))
+    beta = np.linalg.solve((x_ols.T @ x_ols), x_ols.T @ y_ols)
+    hier_LDS.append(np.expand_dims(np.array(beta.T), axis=2))
     
     y_ols = y_ols - x_ols @ beta  # Send residual to be fit by trees deeper down the hierarchy
+    losses.append(np.trace(y_ols.T @ y_ols) / y_ols[:, 0].size)
     del beta
 
     # In[]
@@ -60,10 +61,10 @@ def top_to_bottom(data, max_depth, max_epoch, batch_size, lr, u=None):
                                                                            axis=0))
 
         # Optimize
-        LDS, nu, y_ols, loss = utils.optimize_tree(y_ols, x_ols, LDS, nu, ancestor_weights, K, num_hp, max_epoch,
+        lds, nu, y_ols, loss = utils.optimize_tree(y_ols, x_ols, lds, nu, ancestor_weights, K, num_hp, max_epoch,
                                        batch_size, lr, 1)
-        losses.append(loss)
-        hier_LDS.append(np.array(LDS.data.numpy()))
+        losses = losses + loss
+        hier_LDS.append(np.array(lds.data.numpy()))
         if level != 0:
             hier_nu.append(np.array(nu.data.numpy()))
     
