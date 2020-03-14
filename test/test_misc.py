@@ -1,7 +1,6 @@
 import numpy as np
 import numpy.random as npr
 import trslds.conditionals as samp
-import trslds.utils as utils
 from tqdm import tqdm
 # In[1]:
 dim = 2
@@ -10,13 +9,13 @@ Amean = np.zeros((dim, dim + d_bias))
 Amean[:, :-d_bias] = 0.99 * np.eye(dim)
 no_child = 100000
 scale = 0.5
-V = 40*np.eye(dim + d_bias)
+V = 40 * np.eye(dim + d_bias)
 # In[2]:
 npr.seed(0)
 Areals = np.zeros((dim, dim + d_bias, no_child))
 for m in tqdm(range(no_child)):
-    Areals[:, :, m] = npr.multivariate_normal(Amean.flatten(order='F'), 
-                 np.kron(scale*V, np.eye(dim))).reshape((dim, dim + d_bias), order='F')
+    Areals[:, :, m] = npr.multivariate_normal(Amean.flatten(order='F'),
+                                              np.kron(scale*V, np.eye(dim))).reshape((dim, dim + d_bias), order='F')
 Achild = np.sum(Areals, axis=2)
 
 # In[3]:
