@@ -351,26 +351,29 @@ def create_batches(batch_size, N):
     return idx
 
 
+# In[]
+def compute_residual(X, Y, lds, nu, anc_weights, leaf_weights, y_leafs, temper, num_hp, K):
+    counter = 0
+    for h in range(num_hp):
+        leaf_weights[counter, :] = torch.mul(anc_weights[counter, :],
+                                             torch.sigmoid(temper * torch.matmul(X.transpose(0, 1), nu[:, h])))
+        leaf_weights[counter + 1, :] = torch.mul(anc_weights[counter + 1, :], torch.sigmoid(
+            -temper * torch.matmul(X.transpose(0, 1), nu[:, h])))
+        counter += 2
+
+    # Compute weighted sum of LDS
+    for k in range(K):
+        y_leafs[:, :, k] = torch.mul(leaf_weights[k, :], torch.matmul(lds[:, :, k], X))
+
+    y_pred = torch.sum(y_leafs, 2)
+    resid = Y - y_pred
+    return resid
+
+
 # In[12]:
 def optimize_tree(y, x, LDS, nu, ancestor_weights, K, num_hp, epochs, batch_size, LR, temper):
-    """
-
-    :param y:
-    :param x:
-    :param LDS:
-    :param nu:
-    :param ancestor_weights:
-    :param K:
-    :param HP:
-    :param path_LDS:
-    :param max_epoch:
-    :param batch_size:
-    :param LR:
-    :param temper:
-    :return:
-    """
-    nT = int(x[:, 0].size)  # Number of trajectories
-    rows, cols = x.T.shape
+    N = int(x[:, 0].size)  # Number of trajectories
+    dy = y[:, 0].size
     input_data = torch.from_numpy(x.T).double()
     output_data = torch.from_numpy(y.T).double()
     lds = Variable(torch.from_numpy(LDS), requires_grad=True).double()
@@ -383,14 +386,14 @@ def optimize_tree(y, x, LDS, nu, ancestor_weights, K, num_hp, epochs, batch_size
     # Perform optimization
     for epoch in tqdm(range(epochs)):
         "Create mini batches"
-        batch_idx = create_batches(batch_size, nT)
+        batch_idx = create_batches(batch_size, N)
         for idx in batch_idx:
             optimizer.zero_grad()
             X = input_data[:, idx]
             Y = output_data[:, idx]
             anc_weights = prev_weights[:, idx]
             leaf_weights = torch.zeros(K, idx.size)
-            y_leafs = torch.zeros(rows - 1, idx.size, K)
+            y_leafs = torch.zeros(dy, idx.size, K)
             # if n == num_batches - 1:
             #     X = Variable(input_data[:, n * batch_size:])
             #     Y = Variable(output_data[:, n * batch_size:])
@@ -406,22 +409,23 @@ def optimize_tree(y, x, LDS, nu, ancestor_weights, K, num_hp, epochs, batch_size
             #     y_local = Variable(torch.from_numpy(np.zeros((rows - 1, batch_size, K))))
 
             # Compute weight of each path
-            counter = 0
-            for h in range(0, HP):
-                leaf_weights[counter, :] = torch.mul(anc_weights[counter, :],
-                                                      torch.sigmoid(temper * torch.matmul(X.transpose(0, 1), hp[:, h])))
-                leaf_weights[counter + 1, :] = torch.mul(anc_weights[counter + 1, :], torch.sigmoid(
-                    -temper * torch.matmul(X.transpose(0, 1), hp[:, h])))
-                counter += 2
-
-            # Compute weighted sum of LDS
-            for k in range(0, K):
-                y_leafs[:, :, k] = torch.mul(leaf_weights[k, :], torch.matmul(lds[:, :, k], X))
-
-            y_pred = torch.sum(y_leafs, 2)
+            # counter = 0
+            # for h in range(0, num_hp):
+            #     leaf_weights[counter, :] = torch.mul(anc_weights[counter, :],
+            #                                           torch.sigmoid(temper * torch.matmul(X.transpose(0, 1), nu[:, h])))
+            #     leaf_weights[counter + 1, :] = torch.mul(anc_weights[counter + 1, :], torch.sigmoid(
+            #         -temper * torch.matmul(X.transpose(0, 1), nu[:, h])))
+            #     counter += 2
+            #
+            # # Compute weighted sum of LDS
+            # for k in range(0, K):
+            #     y_leafs[:, :, k] = torch.mul(leaf_weights[k, :], torch.matmul(lds[:, :, k], X))
+            #
+            # y_pred = torch.sum(y_leafs, 2)
 
             # Compute difference
-            resid = Y - y_pred
+            # resid = Y - y_pred
+            resid = compute_residual(X, Y, lds, nu, anc_weights, leaf_weights, y_leafs, temper, num_hp, K)
 
             # Compute MSE
             loss = 0.5 * torch.matmul(resid, resid.transpose(0, 1)).trace() / idx.size
@@ -432,6 +436,9 @@ def optimize_tree(y, x, LDS, nu, ancestor_weights, K, num_hp, epochs, batch_size
             # Update parameters
             optimizer.step()
 
+    # Compute residual of whole trajectory
+    with torch.no_grad():
+        resid = compute_residual(x, y, lds, nu, anc_weights, leaf_weights, y_leafs, temper, num_hp, K)
     return lds, nu, resid.detach().numpy(), loss.item()
 
 
