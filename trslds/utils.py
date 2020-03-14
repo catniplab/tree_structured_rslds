@@ -38,43 +38,44 @@ def compute_ss_mniw(X, Y, nu, Lambda, M, V ):
     V_posterior = np.linalg.inv(Ln)
     return M_posterior, V_posterior, IW_matrix, df_posterior
 
+
 # In[2]:
 def sample_mniw(nu, L, M, S):
-    '''
+    """
     Sample from matrix normal inverse wishart distribution defined by the four parameters.
     :param nu: degree of freedom
     :param L: psd matrix for inverse wishart
     :param M: mean
     :param S: row covariance
     :return: (A,Q) from MNIW distribution
-    '''
-    #Sample from inverse wishart
+    """
+    # Sample from inverse wishart
     Q = invwishart.rvs(nu, L)
-    #Sample from Matrix Normal
+    # Sample from Matrix Normal
     A = npr.multivariate_normal(M.flatten(order='F'), np.kron(S, Q)).reshape(M.shape, order='F')
     return A, Q
 
 
 # In[3]:
 def rotate_latent(states, O):
-    '''
+    """
     Rotate the latent states by the orthogonal matrix O
     :param states: list of continuous latent states
     :param O: orthogonal matrix
     :return: rotated states
-    '''
-    return [ O @ states[idx] for idx in range(len(states))]
+    """
+    return [O @ states[idx] for idx in range(len(states))]
 
 
 # In[4]:
 def rotate_dynamics(A, O, depth):
-    '''
+    """
     Rotate the dynamics of each node in tree
     :param A: list of array where each array corresponds to the dynamics of a certain level in the tree.
     :param O: orthogonal matrix
     :param depth: maximum depth of tree
     :return: rotated dynamics
-    '''
+    """
     for level in range(depth):
         for node in range(2 ** level):
             A[level][:, :-1, node] = O @ A[level][:, :-1, node] @ O.T  # Rotate dynamics
@@ -84,16 +85,28 @@ def rotate_dynamics(A, O, depth):
 
 # In[5]:
 def sample_hyperplanes(states, omega, paths, depth, prior_mu, prior_tau, possible_paths, R):
-    X = np.hstack(states) #stack all continuous latent states
-    X = np.vstack((X, np.ones((1, X[0, :].size)))) #append a vector of all ones
-    W = np.hstack(omega) #stack all polya-gamma rvs
-    path = np.hstack(paths) #append all paths taken through the tree
+    """
+    Sample from conditional posterior of hyperplanes
+    :param states: continuous latent states
+    :param omega: augmented polya-gamma random variables
+    :param paths: path that each latent state took
+    :param depth: depth of tree
+    :param prior_mu: prior mean
+    :param prior_tau: prior covariance
+    :param possible_paths: possible paths that can be taken in the tree
+    :param R: Used to hold samples
+    :return: R
+    """
+    X = np.hstack(states)  # stack all continuous latent states
+    X = np.vstack((X, np.ones((1, X[0, :].size))))  # append a vector of all ones
+    W = np.hstack(omega)  # stack all polya-gamma rvs
+    path = np.hstack(paths)  # append all paths taken through the tree
 
-    for level in range(depth - 1): #Traverse through the tree. Note that only internal nodes have hyperplanes
+    for level in range(depth - 1):  # Traverse through the tree. Note that only internal nodes have hyperplanes
         for node in range(2 ** level):
             # Check to see if current node is a leaf node or not
-            if np.isnan(possible_paths[level + 1, 2 * node + 1]) == False:
-                indices = path[level, :] == (node + 1) #Create a boolean mask
+            if ~np.isnan(possible_paths[level + 1, 2 * node + 1]):
+                indices = path[level, :] == (node + 1)  # Create a boolean mask
                 effective_x = X[:, indices]
                 effective_w = W[level, indices]
                 effective_z = path[level + 1, indices]
