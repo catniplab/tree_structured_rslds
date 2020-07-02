@@ -144,8 +144,9 @@ class TroSLDS:
 
         if self.bern:
             self.spike_omega = [None] * len(self.x)  # Initialize the polya-gamma rvs for spike trains
-            self.spike_omega = conditionals.pg_spike_train(self.x, self.y, self.C, self.spike_omega, self.D_out,
-                                                           N=self.N, neg_bin=self.neg_bin)
+            self._sample_spike_pg()
+            # self.spike_omega = conditionals.pg_spike_train(self.x, self.y, self.C, self.spike_omega, self.D_out,
+            #                                                N=self.N, neg_bin=self.neg_bin)
 
 
 # In[2]:
@@ -210,7 +211,8 @@ class TroSLDS:
         self.omega = conditionals.pg_tree_posterior(self.x, self.omega, self.R, self.path, self.depth)
 
     def _sample_spike_pg(self):
-        self.spike_omega = conditionals.pg_spike_train(self.x, self.C, self.spike_omega, self.D_out, N=self.N)
+        self.spike_omega = conditionals.pg_spike_train(self.x, self.y, self.C, self.spike_omega, self.D_out, N=self.N,
+                                                       neg_bin=self.neg_bin)
 
 # In[8]:
     def _sample_continuous_latent(self):

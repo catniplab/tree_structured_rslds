@@ -68,7 +68,7 @@ def pg_spike_train(X, Y, C, Omega, D_out, nthreads=None, N=1, neg_bin=False):
         T = X[idx][0, 1:].size
         b = N * np.ones(T * D_out)
         if neg_bin:
-            b += Y[idx]
+            b += Y[idx].flatten(order='F')
         if nthreads is None:
             nthreads = n_cpu
         out = np.empty(T * D_out)
