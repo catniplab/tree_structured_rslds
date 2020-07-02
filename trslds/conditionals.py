@@ -51,20 +51,24 @@ def pg_tree_posterior(states, omega, R, path, depth, nthreads=None):
 
 
 # In[2]:
-def pg_spike_train(X, C, Omega, D_out, nthreads=None, N=1):
+def pg_spike_train(X, Y, C, Omega, D_out, nthreads=None, N=1, neg_bin=False):
     """
     Sample Polya-Gamma wy|Y,C,D,X where Y are spike trains and X are the continuous latent states
     :param X: List of continuous latent states
+    :param Y: list of spike trains
     :param C: emission parameters. bias parameter is appended to last column.
     :param Omega: list used for storing polya-gamma variables
     :param D_out: Dimension of output i..e number of neurons
     :param nthreads: Number of threads for parallel sampling.
-    :param N: Maximum number of spikes i.e. N from a binomial distribution
+    :param N: Maximum number of spikes N for a binomial distribution, or number of failures in negative binomial
+    :param neg_bin: Boolean flag dictating whether likelihood is negative binomial
     :return:
     """
     for idx in range(len(X)):
         T = X[idx][0, 1:].size
         b = N * np.ones(T * D_out)
+        if neg_bin:
+            b += Y[idx]
         if nthreads is None:
             nthreads = n_cpu
         out = np.empty(T * D_out)
@@ -119,7 +123,7 @@ def emission_parameters(obsv, states, mask, nu, Lambda, M, V, normalize=True):
 
 
 # In[4]:
-def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, normalize=True, N=1):
+def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, normalize=True, N=1, neg_bin=False):
     """
     Sample from conditional posterior of emission parameters where emission model is a bernoulli glm.
     :param spikes: list of spike trains
@@ -152,8 +156,12 @@ def emission_parameters_spike_train(spikes, states, Omega, mask, mu, Sigma, norm
 
         xw_tilde = np.multiply(X, np.sqrt(W[neuron, :]))  # pre multiply by sqrt(w_n,t )
         Lambda_post += np.einsum('ij,ik->jk', xw_tilde.T, xw_tilde.T)  # Use einstein summation to compute sum of outer products
+        if neg_bin:
+            kappa = (Y[neuron, :][na, :] - N) / 2
+        else:
+            kappa = Y[neuron, :][na, :] - N / 2
 
-        temp_mu += np.sum((X * (Y[neuron, :][na, :] - N / 2)).T, axis=0)
+        temp_mu += np.sum((X * kappa).T, axis=0)
         Sigma_post = np.linalg.inv(Lambda_post)
         mu_post = np.matmul(temp_mu, Sigma_post)
         # Sample from mvn posterior
@@ -287,7 +295,7 @@ def discrete_latent_recurrent_only(Z, paths, leaf_path, K, X, U, A, Q, R, depth,
 
 # In[]
 def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
-          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1, marker=1):
+          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1, neg_bin=False, marker=1):
     """
     Polya-Gamma augmented kalman filter for sampling the continuous latent states
     :param D_in: dimension of latent space
@@ -350,7 +358,10 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
         x_prior = As[:, :-D_bias, int(Z[t])] @ alpha + As[:, -D_bias:, int(Z[t])] @ U[:, t][:, na]
         P_prior = As[:, :-D_bias, int(Z[t])] @ Lambda @ As[:, :-D_bias, int(Z[t])].T + Q
         if bern:  # If observations are bernoulli
-            kt = Y[:, t] - N / 2
+            if neg_bin:
+                kt = (Y[:, t] - N) / 2
+            else:
+                kt = Y[:, t] - N / 2
             S = np.diag(1 / omegay[:, t])
             yt = kt / omegay[:, t]
         else:
@@ -395,7 +406,7 @@ def pg_kalman(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
 
 # In[9]:
 def pg_kalman_batch(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
-          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1):
+          alphas, Lambdas, R, depth, omegay=None, bern=False, N=1, neg_bin=False):
     """
     Polya-Gamma augmented kalman filter for sampling the continuous latent states
     :param D_in: dimension of latent space
@@ -460,7 +471,10 @@ def pg_kalman_batch(D_in, D_bias, X, U, P, As, Qs, C, S, Y, paths, Z, omega,
             x_prior = As[:, :-D_bias, int(Z[idx][t])] @ alpha + As[:, -D_bias:, int(Z[idx][t])] @ U[idx][:, t][:, na]
             P_prior = As[:, :-D_bias, int(Z[idx][t])] @ Lambda @ As[:, :-D_bias, int(Z[idx][t])].T + Q
             if bern:  # If observations are bernoulli
-                kt = Y[idx][:, t] - N / 2
+                if neg_bin:
+                    kt = (Y[idx][:, t] - N) / 2
+                else:
+                    kt = Y[idx][:, t] - N / 2
                 S = np.diag(1 / omegay[idx][:, t])
                 yt = kt / omegay[idx][:, t]
             else:
