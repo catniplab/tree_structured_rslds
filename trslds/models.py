@@ -23,7 +23,7 @@ class TroSLDS:
     def __init__(self, D_in, D_out, K, dynamics, dynamics_noise, emission, hyper_planes, possible_paths, leaf_path,
                  leaf_nodes, D_bias=1, nu=None, nuy=None, Lambda_x=None, Lambda_y=None, My=None, Vy=None,
                  mu_hyper=None, tau_hyper=None, Mx=None, Vx=None, bern=False, emission_noise=None, normalize=True,
-                 rotate=True, P0=None, scale=None, N=1):
+                 rotate=True, P0=None, scale=None, N=1, neg_bin=False):
         self.D_in = D_in  # Dimension of latent states
         self.D_out = D_out  # Dimension of observations
         self.K = K  # Number of discrete states
@@ -108,6 +108,7 @@ class TroSLDS:
         self.normalize = normalize
         self.rotate = rotate
         self.bern = bern  # Are the observations gaussian or bernoulli (spikes)
+        self.neg_bin = neg_bin
         self.N = N  # Maximum number of spikes in a bin i.e. Binomial(N, p)
 
         # Used for storing values in kalman filter
@@ -143,7 +144,8 @@ class TroSLDS:
 
         if self.bern:
             self.spike_omega = [None] * len(self.x)  # Initialize the polya-gamma rvs for spike trains
-            self.spike_omega = conditionals.pg_spike_train(self.x, self.C, self.spike_omega, self.D_out, N=self.N)
+            self.spike_omega = conditionals.pg_spike_train(self.x, self.y, self.C, self.spike_omega, self.D_out,
+                                                           N=self.N, neg_bin=self.neg_bin)
 
 
 # In[2]:
@@ -155,7 +157,8 @@ class TroSLDS:
     def _sample_emission(self):
         if self.bern:
             self.C = conditionals.emission_parameters_spike_train(self.y, self.x, self.spike_omega, self.mask,
-                                                                  self.My[0, :], self.Vy, self.normalize, N=self.N)
+                                                                  self.My[0, :], self.Vy, self.normalize, N=self.N,
+                                                                  neg_bin=self.neg_bin)
         else:
             self.C, self.S = conditionals.emission_parameters(self.y, self.x, self.mask, self.nuy, self.lambday,
                                                               self.My, self.Vy, self.normalize)
@@ -221,12 +224,12 @@ class TroSLDS:
             self._sample_pg()  # sample polya-gamma associated with tree
             self._sample_spike_pg()  # sample polya-gamma associated with spikes
             temps = Parallel(n_jobs=n_cpu)(delayed(conditionals.pg_kalman)(self.D_in, self.D_bias, self.x[n],
-                                                                             self.u[n], self.P, self.Aleaf, self.Q,
-                                                                             self.C, 0, self.y[n], self.path[n],
-                                                                             self.z[n], self.omega[n], self.alphas,
-                                                                             self.covs, self.R, self.depth,
-                                                                             omegay=self.spike_omega[n],
-                                                                             bern=self.bern, N=self.N, marker=n)
+                                                                           self.u[n], self.P, self.Aleaf, self.Q,
+                                                                           self.C, 0, self.y[n], self.path[n],
+                                                                           self.z[n], self.omega[n], self.alphas,
+                                                                           self.covs, self.R, self.depth,
+                                                                           omegay=self.spike_omega[n], bern=self.bern,
+                                                                           N=self.N, neg_bin=self.neg_bin, marker=n)
                                            for n in range(len(self.x)))
             for n in range(len(temps)):
                 self.x[temps[n][1]] = temps[n][0]
